@@ -1,3 +1,4 @@
+use super::vec2::Vec2;
 use std::ops;
 /// Representation of 3D vectors and points
 pub struct Vec3 {
@@ -10,6 +11,14 @@ impl Vec3 {
     /// Creates a vector given x,y,z
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         Vec3 { x, y, z }
+    }
+
+    pub fn from_vec3(xy: Vec2, z: f32) -> Self {
+        Vec3 {
+            x: xy.x,
+            y: xy.y,
+            z,
+        }
     }
 
     /// Creates a vector with all components being zero
@@ -179,6 +188,13 @@ impl Vec3 {
         // All are equal
         return self.x;
     }
+
+    pub fn xy(&self) -> Vec2 {
+        Vec2 {
+            x: self.x,
+            y: self.y,
+        }
+    }
 }
 
 // Traits
@@ -203,7 +219,7 @@ impl ops::Add for Vec3 {
     type Output = Self;
     fn add(self, other: Self) -> Self {
         Self {
-            x: self.x + other.y,
+            x: self.x + other.x,
             y: self.y + other.y,
             z: self.z + other.z,
         }
@@ -213,7 +229,7 @@ impl ops::Add for Vec3 {
 /// Compound addition to vector component wise
 impl ops::AddAssign for Vec3 {
     fn add_assign(&mut self, other: Self) {
-        self.x += other.y;
+        self.x += other.x;
         self.y += other.y;
         self.z += other.z;
     }
@@ -224,7 +240,7 @@ impl ops::Sub for Vec3 {
     type Output = Self;
     fn sub(self, other: Self) -> Self {
         Self {
-            x: self.x - other.y,
+            x: self.x - other.x,
             y: self.y - other.y,
             z: self.z - other.z,
         }
@@ -234,7 +250,7 @@ impl ops::Sub for Vec3 {
 /// Compound subtraction to vector component wise
 impl ops::SubAssign for Vec3 {
     fn sub_assign(&mut self, other: Self) {
-        self.x -= other.y;
+        self.x -= other.x;
         self.y -= other.y;
         self.z -= other.z;
     }
@@ -255,7 +271,7 @@ impl ops::Mul for Vec3 {
 // Compound multiplies two vectors component wise
 impl ops::MulAssign for Vec3 {
     fn mul_assign(&mut self, other: Self) {
-        self.x *= other.y;
+        self.x *= other.x;
         self.y *= other.y;
         self.z *= other.z;
     }

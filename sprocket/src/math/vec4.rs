@@ -138,7 +138,7 @@ impl ops::Add for Vec4 {
     type Output = Self;
     fn add(self, other: Self) -> Self {
         Self {
-            x: self.x + other.y,
+            x: self.x + other.x,
             y: self.y + other.y,
             z: self.z + other.z,
             w: self.w + other.w,
@@ -149,7 +149,7 @@ impl ops::Add for Vec4 {
 /// Compound addition to vector component wise
 impl ops::AddAssign for Vec4 {
     fn add_assign(&mut self, other: Self) {
-        self.x += other.y;
+        self.x += other.x;
         self.y += other.y;
         self.z += other.z;
         self.w += other.w;
@@ -161,7 +161,7 @@ impl ops::Sub for Vec4 {
     type Output = Self;
     fn sub(self, other: Self) -> Self {
         Self {
-            x: self.x - other.y,
+            x: self.x - other.x,
             y: self.y - other.y,
             z: self.z - other.z,
             w: self.w - other.w,
@@ -172,7 +172,7 @@ impl ops::Sub for Vec4 {
 /// Compound subtraction to vector component wise
 impl ops::SubAssign for Vec4 {
     fn sub_assign(&mut self, other: Self) {
-        self.x -= other.y;
+        self.x -= other.x;
         self.y -= other.y;
         self.z -= other.z;
         self.w -= other.w;
@@ -195,7 +195,7 @@ impl ops::Mul for Vec4 {
 // Compound multiplies two vectors component wise
 impl ops::MulAssign for Vec4 {
     fn mul_assign(&mut self, other: Self) {
-        self.x *= other.y;
+        self.x *= other.x;
         self.y *= other.y;
         self.z *= other.z;
         self.w *= other.w;
