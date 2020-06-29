@@ -5,7 +5,7 @@ The aim for the engine is to have the user in control. The programming is done d
 Currently, not much is implemented
 
 ## The plan
-The plan for Sprocket is to be a powerfull multi-threaded game engine for 2D as well as 3D
+The plan for Sprocket is to be a powerful multi-threaded game engine for 2D as well as 3D
 
 ### Main features
 * Vulkan rendering
