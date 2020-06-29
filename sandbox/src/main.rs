@@ -1,27 +1,22 @@
 use log::{debug, error, info, trace, warn};
 use sprocket::*;
-
+use std::thread;
+use std::time::Duration;
 fn main() {
     let application = Application::new("Sandbox");
+    info!("Created application {}", application.name());
 
     logger::init(log::LevelFilter::Trace);
-    let a = Vec3::new(1.0, 0.0, 0.0);
-    let b = Vec4::new(1.0, 1.0, 0.0, 5.0);
-    let pos = b.xyz();
-    println!("a.norm(): {}", a.norm());
-    println!("b.norm(): {}", b.norm());
-    println!("Dot: {}", Vec3::dot(&a.norm(), &pos.norm()));
-    let v = Vec2::new(1.0, 1.0).norm();
-    println!("v: {}", v);
-    let b = Vec2::right();
-    println!("b: {}", b);
-    let other = v + b;
-    println!("v: {}", other);
+    Window::init_glfw();
+    let window = Window::new("Sandbox", 800, 600);
+    loop {
+        thread::sleep(Duration::from_millis(200));
+    }
+    // let mut window =
+    //     Window::new("Sandbox", 800, 600, WindowMode::FullScreen).expect("Failed to create window");
 
-    println!(
-        "{}",
-        Vec3::new(1.0, 2.0, 0.0).norm() + Vec3::forward()
-    );
-
-    info!("Created application {}", application.name());
+    // loop {
+    //     thread::sleep(Duration::from_millis(500));
+    //     window.poll_events();
+    // }
 }
