@@ -1,9 +1,9 @@
 use std::ops;
 /// Representation of 3D vectors and points
 pub struct Vec3 {
-    x: f32,
-    y: f32,
-    z: f32,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
 }
 
 impl Vec3 {
