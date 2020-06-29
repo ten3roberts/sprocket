@@ -8,7 +8,7 @@ fn main() {
 
     logger::init(log::LevelFilter::Trace);
     Window::init_glfw();
-    let window = Window::new("Sandbox", 800, 600);
+    let window = Window::new("Sandbox", 800, 600, WindowMode::Windowed);
     info!("Window title '{}'", window.title());
     loop {
         window.process_events();

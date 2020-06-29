@@ -3,11 +3,17 @@ use super::glfw::*;
 use log::{error, info};
 use std::ptr;
 
+pub enum WindowMode {
+    Windowed,
+    Borderless,
+    Fullscreen,
+}
+
 pub struct Window {
     title: String,
     width: i32,
     height: i32,
-    raw_window: *mut GLFWWindow,
+    raw_window: *mut GLFWwindow,
 }
 
 impl Window {
@@ -26,11 +32,20 @@ impl Window {
         }
     }
 
-    pub fn new(title: &str, width: i32, height: i32) -> Window {
-        unsafe { glfwWindowHint(GLFW_DECORATED, 0) }
-
-        let raw_window =
-            unsafe { glfwCreateWindow(width, height, title.as_ptr(), ptr::null(), ptr::null()) };
+    pub fn new(title: &str, width: i32, height: i32, mode: WindowMode) -> Window {
+        unsafe { glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API) };
+        let mut monitor: *const GLFWmonitor = ptr::null();
+        let raw_window = unsafe {
+            match mode {
+                WindowMode::Borderless => glfwWindowHint(GLFW_DECORATED, 0),
+                WindowMode::Windowed => {}
+                WindowMode::Fullscreen => {
+                    glfwWindowHint(GLFW_DECORATED, 0);
+                    monitor = glfwGetPrimaryMonitor();
+                }
+            }
+            glfwCreateWindow(width, height, title.as_ptr(), monitor, ptr::null())
+        };
 
         Window {
             title: String::from(title),

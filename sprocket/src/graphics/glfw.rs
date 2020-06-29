@@ -17,9 +17,11 @@ extern "C" {
     ) -> *mut ffi::c_void;
     pub fn glfwPollEvents();
     pub fn glfwWindowHint(hint: i32, value: i32);
+    pub fn glfwGetPrimaryMonitor() -> *const GLFWmonitor;
 }
 
-pub type GLFWWindow = ffi::c_void;
+pub type GLFWwindow = ffi::c_void;
+pub type GLFWmonitor = ffi::c_void;
 
 #[link(name = "glfw")]
 pub const GLFW_FOCUSED: i32 = 0x00020001;
