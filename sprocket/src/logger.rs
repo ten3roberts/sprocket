@@ -1,5 +1,5 @@
-use log::{Metadata, Record};
-use log::{LevelFilter};
+use colorful::{Color, Colorful};
+use log::{Level, LevelFilter, Metadata, Record};
 
 struct Logger;
 
@@ -13,9 +13,19 @@ impl log::Log for Logger {
             return;
         }
 
+        let level = record.level();
+
+        let color = match level {
+            Level::Trace => Color::LightGray,
+            Level::Debug => Color::LightGray,
+            Level::Info => Color::Blue,
+            Level::Warn => Color::Yellow,
+            Level::Error => Color::Red,
+        };
+
         println!(
             "[{}] {}: {}",
-            record.level(),
+            level.to_string().color(color),
             record.target(),
             record.args()
         );
