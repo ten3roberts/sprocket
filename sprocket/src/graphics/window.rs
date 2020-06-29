@@ -32,16 +32,28 @@ impl Window {
         }
     }
 
-    pub fn new(title: &str, width: i32, height: i32, mode: WindowMode) -> Window {
-        unsafe { glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API) };
+    /// Creates a new window with specified title, width, height, and mode
+    /// Mode specified if the window is normal windowed, fullscreen or borderless
+    /// if any dimension is -1, it will be set to the native resolution
+    pub fn new(title: &str, mut width: i32, mut height: i32, mode: WindowMode) -> Window {
         let mut monitor: *const GLFWmonitor = ptr::null();
         let raw_window = unsafe {
+            let primary = glfwGetPrimaryMonitor();
+            let vidmode = glfwGetVideoMode(primary);
+            if width == -1 {
+                width = (*vidmode).width;
+            }
+            if height == -1 {
+                height = (*vidmode).height;
+            }
+
+            glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
             match mode {
                 WindowMode::Borderless => glfwWindowHint(GLFW_DECORATED, 0),
                 WindowMode::Windowed => {}
                 WindowMode::Fullscreen => {
                     glfwWindowHint(GLFW_DECORATED, 0);
-                    monitor = glfwGetPrimaryMonitor();
+                    monitor = primary;
                 }
             }
             glfwCreateWindow(width, height, title.as_ptr(), monitor, ptr::null())

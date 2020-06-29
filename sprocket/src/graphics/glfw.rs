@@ -18,10 +18,20 @@ extern "C" {
     pub fn glfwPollEvents();
     pub fn glfwWindowHint(hint: i32, value: i32);
     pub fn glfwGetPrimaryMonitor() -> *const GLFWmonitor;
+    pub fn glfwGetVideoMode(monitor: *const GLFWmonitor) -> *const GLFWvidmode;
 }
 
 pub type GLFWwindow = ffi::c_void;
 pub type GLFWmonitor = ffi::c_void;
+#[repr(C)]
+pub struct GLFWvidmode {
+    pub width: i32,
+    pub height: i32,
+    pub redBits: i32,
+    pub greenBits: i32,
+    pub blueBits: i32,
+    pub refreshRate: i32,
+}
 
 #[link(name = "glfw")]
 pub const GLFW_FOCUSED: i32 = 0x00020001;
