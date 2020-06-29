@@ -1,21 +1,7 @@
+use super::glfw::*;
+
 use log::{error, info};
-use std::ffi;
 use std::ptr;
-
-#[link(name = "glfw")]
-extern "C" {
-    fn glfwInit() -> i32;
-    fn glfwGetVersion(major: *mut i32, minor: *mut i32, rev: *mut i32);
-    fn glfwCreateWindow(
-        width: i32,
-        height: i32,
-        title: *const u8,
-        monitor: *const ffi::c_void,
-        share: *const ffi::c_void,
-    ) -> *mut ffi::c_void;
-}
-
-type GLFWWindow = ffi::c_void;
 
 pub struct Window {
     title: String,
@@ -41,6 +27,8 @@ impl Window {
     }
 
     pub fn new(title: &str, width: i32, height: i32) -> Window {
+        unsafe { glfwWindowHint(GLFW_DECORATED, 0) }
+
         let raw_window =
             unsafe { glfwCreateWindow(width, height, title.as_ptr(), ptr::null(), ptr::null()) };
 
@@ -50,5 +38,20 @@ impl Window {
             height,
             raw_window,
         }
+    }
+
+    pub fn process_events(&self) {
+        unsafe { glfwPollEvents() };
+    }
+
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+
+    pub fn width(&self) -> i32 {
+        self.width
+    }
+    pub fn height(&self) -> i32 {
+        self.height
     }
 }

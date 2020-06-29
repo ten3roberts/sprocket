@@ -9,7 +9,9 @@ fn main() {
     logger::init(log::LevelFilter::Trace);
     Window::init_glfw();
     let window = Window::new("Sandbox", 800, 600);
+    info!("Window title '{}'", window.title());
     loop {
+        window.process_events();
         thread::sleep(Duration::from_millis(200));
     }
     // let mut window =
