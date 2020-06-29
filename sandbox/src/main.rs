@@ -1,7 +1,11 @@
+use log::{debug, info};
 use sprocket::*;
 
 fn main() {
     let application = Application::new("Sandbox");
 
-    println!("Created application with name {}", application.name());
+    logger::init(log::LevelFilter::Info);
+    debug!("Trace message");
+    info!("Created sandbox app");
+    info!("Created application {}", application.name());
 }

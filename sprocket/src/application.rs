@@ -3,6 +3,7 @@ pub struct Application {
 }
 
 impl Application {
+    /// Creates a new blank application with the given name
     pub fn new(name: &str) -> Application {
         Application {
             name: String::from(name),
