@@ -46,6 +46,27 @@ extern "C" {
         window: *mut GLFWwindow,
         callback: extern "C" fn(window: *mut GLFWwindow, button: i32, action: i32),
     );
+
+    pub fn glfwSetScrollCallback(
+        window: *mut GLFWwindow,
+        callback: extern "C" fn(window: *mut GLFWwindow, xoffset: f64, yoffset: f64),
+    );
+    pub fn glfwSetCursorPosCallback(
+        window: *mut GLFWwindow,
+        callback: extern "C" fn(window: *mut GLFWwindow, xpos: f64, ypos: f64),
+    );
+    pub fn glfwSetWindowSizeCallback(
+        window: *mut GLFWwindow,
+        callback: extern "C" fn(window: *mut GLFWwindow, width: i32, height: i32),
+    );
+    pub fn glfwSetWindowFocusCallback(
+        window: *mut GLFWwindow,
+        callback: extern "C" fn(window: *mut GLFWwindow, focused: i32),
+    );
+    pub fn glfwSetCharCallback(
+        window: *mut GLFWwindow,
+        callback: extern "C" fn(window: *mut GLFWwindow, codepoint: u32),
+    );
 }
 
 pub type GLFWwindow = ffi::c_void;

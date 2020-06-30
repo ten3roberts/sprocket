@@ -79,6 +79,11 @@ impl Window {
             glfwSetWindowCloseCallback(raw_window, close_callback);
             glfwSetKeyCallback(raw_window, key_callback);
             glfwSetMouseButtonCallback(raw_window, mouse_button_callback);
+            glfwSetScrollCallback(raw_window, scroll_callback);
+            glfwSetCursorPosCallback(raw_window, mouse_position_callback);
+            glfwSetWindowSizeCallback(raw_window, window_size_callback);
+            glfwSetWindowFocusCallback(raw_window, window_focus_callback);
+            glfwSetCharCallback(raw_window, char_callback);
         }
 
         window
@@ -135,6 +140,7 @@ extern "C" fn close_callback(window: *mut GLFWwindow) {
         };
     }
 }
+#[no_mangle]
 extern "C" fn key_callback(
     window: *mut GLFWwindow,
     key: i32,
@@ -160,7 +166,7 @@ extern "C" fn key_callback(
         };
     }
 }
-
+#[no_mangle]
 extern "C" fn mouse_button_callback(window: *mut GLFWwindow, button: i32, action: i32) {
     unsafe {
         if let Some(sender) = get_sender(window) {
@@ -178,6 +184,59 @@ extern "C" fn mouse_button_callback(window: *mut GLFWwindow, button: i32, action
             };
             (*sender)
                 .send(event)
+                .expect("Failed to send window close event");
+        };
+    }
+}
+#[no_mangle]
+extern "C" fn scroll_callback(window: *mut GLFWwindow, xoffset: f64, yoffset: f64) {
+    unsafe {
+        if let Some(sender) = get_sender(window) {
+            // Convert button 0-5 to keycode which starts with mouse buttons after keyboard keys
+
+            (*sender)
+                .send(Event::Scroll(xoffset as i32, yoffset as i32))
+                .expect("Failed to send window close event");
+        };
+    }
+}
+#[no_mangle]
+extern "C" fn mouse_position_callback(window: *mut GLFWwindow, xpos: f64, ypos: f64) {
+    unsafe {
+        if let Some(sender) = get_sender(window) {
+            (*sender)
+                .send(Event::MousePosition(xpos as i32, ypos as i32))
+                .expect("Failed to send window close event");
+        };
+    }
+}
+#[no_mangle]
+extern "C" fn window_size_callback(window: *mut GLFWwindow, width: i32, height: i32) {
+    unsafe {
+        if let Some(sender) = get_sender(window) {
+            (*sender)
+                .send(Event::WindowResize(width, height))
+                .expect("Failed to send window close event");
+        };
+    }
+}
+#[no_mangle]
+extern "C" fn window_focus_callback(window: *mut GLFWwindow, focus: i32) {
+    unsafe {
+        if let Some(sender) = get_sender(window) {
+            (*sender)
+                .send(Event::WindowFocus(focus != 0))
+                .expect("Failed to send window close event");
+        };
+    }
+}
+extern "C" fn char_callback(window: *mut GLFWwindow, codepoint: u32) {
+    unsafe {
+        if let Some(sender) = get_sender(window) {
+            (*sender)
+                .send(Event::CharacterType(
+                    std::char::from_u32(codepoint).unwrap_or('\u{fffd}'),
+                ))
                 .expect("Failed to send window close event");
         };
     }

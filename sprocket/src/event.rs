@@ -4,13 +4,19 @@ use num_derive::FromPrimitive;
 pub enum Event {
     WindowClose,
     WindowResize(i32, i32),
-    MouseMove(i32, i32),
+    WindowFocus(bool),
+
+    MousePosition(i32, i32),
+    Scroll(i32, i32),
     /// Key or mouse button was pressed down
     KeyPress(KeyCode),
     /// Key or mouse button was released
     KeyRelease(KeyCode),
     /// Key was held down long enough to be repeated
     KeyRepeat(KeyCode),
+    /// A full character taking into account modifier keys and dead keys
+    /// Use this for user input
+    CharacterType(char),
     Dummy(String),
 }
 
