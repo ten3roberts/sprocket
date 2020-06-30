@@ -19,6 +19,15 @@ extern "C" {
     pub fn glfwWindowHint(hint: i32, value: i32);
     pub fn glfwGetPrimaryMonitor() -> *const GLFWmonitor;
     pub fn glfwGetVideoMode(monitor: *const GLFWmonitor) -> *const GLFWvidmode;
+
+    pub fn glfwSetWindowUserPointer(window: *mut GLFWwindow, pointer: *mut ffi::c_void);
+    pub fn glfwGetWindowUserPointer(window: *mut GLFWwindow) -> *mut ffi::c_void;
+    // Callbacks
+
+    pub fn glfwSetWindowCloseCallback(
+        window: *mut GLFWwindow,
+        callback: extern "C" fn(*mut GLFWwindow),
+    );
 }
 
 pub type GLFWwindow = ffi::c_void;

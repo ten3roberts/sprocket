@@ -59,12 +59,20 @@ impl Window {
             glfwCreateWindow(width, height, title.as_ptr(), monitor, ptr::null())
         };
 
-        Window {
+        let window = Window {
             title: String::from(title),
             width,
             height,
             raw_window,
+        };
+
+        unsafe {
+            // Set callbacks
+            glfwSetWindowCloseCallback(raw_window, close_callback);
+            // glfwSetWindowUserPointer(raw_window, &window as *mut ffi::c_void);
         }
+
+        window
     }
 
     pub fn process_events(&self) {
@@ -81,4 +89,17 @@ impl Window {
     pub fn height(&self) -> i32 {
         self.height
     }
+}
+#[no_mangle]
+extern "C" fn close_callback(_window: *mut GLFWwindow) {
+    // let window = unsafe {
+    //     let window = glfwGetWindowUserPointer(window) as *mut Window;
+    //     if window == ptr::null_mut() {
+    //         error!("Invalid window user pointer");
+    //         return;
+    //     } else {
+    //         &*window
+    //     }
+    // };
+    info!("Received close event for window");
 }
