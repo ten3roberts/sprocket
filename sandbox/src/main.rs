@@ -10,7 +10,7 @@ fn main() {
     info!("Window title '{}'", window.title());
 
     application.add_window(window);
-    application.add_window(Window::new("Other Window", 100, 100, WindowMode::Windowed));
+    application.add_window(Window::new("Other Window", 200, 500, WindowMode::Windowed));
     application.run();
 
     info!("Terminating application");

@@ -32,7 +32,7 @@ impl Application {
     }
 
     pub fn run(&mut self) {
-        loop {
+        while self.windows.len() > 0 {
             // Process each window for events
             self.windows
                 .iter()
@@ -44,6 +44,7 @@ impl Application {
             while let Ok(event) = self.event_receiver.try_recv() {
                 info!("Event: {:?}", event);
             }
+
             thread::sleep(Duration::from_millis(200));
         }
     }

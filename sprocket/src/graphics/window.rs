@@ -57,7 +57,10 @@ impl Window {
                     monitor = primary;
                 }
             }
-            glfwCreateWindow(width, height, title.as_ptr(), monitor, ptr::null())
+            let c_title =
+                std::ffi::CString::new(title).expect("Failed to convert window title to c_str");
+
+            glfwCreateWindow(width, height, c_title.as_ptr(), monitor, ptr::null())
         };
 
         let window = Window {

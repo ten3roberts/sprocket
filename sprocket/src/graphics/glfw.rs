@@ -11,7 +11,7 @@ extern "C" {
     pub fn glfwCreateWindow(
         width: i32,
         height: i32,
-        title: *const u8,
+        title: *const i8,
         monitor: *const ffi::c_void,
         share: *const ffi::c_void,
     ) -> *mut ffi::c_void;
