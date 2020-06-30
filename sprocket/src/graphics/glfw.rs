@@ -30,6 +30,22 @@ extern "C" {
         window: *mut GLFWwindow,
         callback: extern "C" fn(*mut GLFWwindow),
     );
+
+    pub fn glfwSetKeyCallback(
+        window: *mut GLFWwindow,
+        callback: extern "C" fn(
+            window: *mut GLFWwindow,
+            key: i32,
+            scancode: i32,
+            action: i32,
+            mods: i32,
+        ),
+    );
+
+    pub fn glfwSetMouseButtonCallback(
+        window: *mut GLFWwindow,
+        callback: extern "C" fn(window: *mut GLFWwindow, button: i32, action: i32),
+    );
 }
 
 pub type GLFWwindow = ffi::c_void;
@@ -98,3 +114,7 @@ pub const GLFW_OPENGL_ES_API: i32 = 0x00030002;
 pub const GLFW_NO_ROBUSTNESS: i32 = 0;
 pub const GLFW_NO_RESET_NOTIFICATION: i32 = 0x00031001;
 pub const GLFW_LOSE_CONTEXT_ON_RESET: i32 = 0x00031002;
+
+pub const GLFW_RELEASE: i32 = 0;
+pub const GLFW_PRESS: i32 = 1;
+pub const GLFW_REPEAT: i32 = 2;

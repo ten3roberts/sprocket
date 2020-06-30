@@ -1,8 +1,11 @@
 use super::glfw::*;
 use crate::event::Event;
-use log::{error, info};
+use crate::event::KeyCode;
+use log::{error, info, warn};
 use std::ptr;
 use std::sync::mpsc;
+
+use num_traits::FromPrimitive;
 
 pub enum WindowMode {
     Windowed,
@@ -71,9 +74,11 @@ impl Window {
         };
 
         unsafe {
+            glfwSetWindowUserPointer(raw_window, ptr::null_mut());
             // Set callbacks
             glfwSetWindowCloseCallback(raw_window, close_callback);
-            glfwSetWindowUserPointer(raw_window, ptr::null_mut());
+            glfwSetKeyCallback(raw_window, key_callback);
+            glfwSetMouseButtonCallback(raw_window, mouse_button_callback);
         }
 
         window
@@ -126,6 +131,53 @@ extern "C" fn close_callback(window: *mut GLFWwindow) {
         if let Some(sender) = get_sender(window) {
             (*sender)
                 .send(Event::WindowClose)
+                .expect("Failed to send window close event");
+        };
+    }
+}
+extern "C" fn key_callback(
+    window: *mut GLFWwindow,
+    key: i32,
+    _scancode: i32,
+    action: i32,
+    _mods: i32,
+) {
+    unsafe {
+        if let Some(sender) = get_sender(window) {
+            let key = KeyCode::from_i32(key).unwrap_or(KeyCode::Invalid);
+            let event = match action {
+                GLFW_PRESS => Event::KeyPress(key),
+                GLFW_RELEASE => Event::KeyRelease(key),
+                GLFW_REPEAT => Event::KeyRepeat(key),
+                _ => {
+                    warn!("Unknown key action {}", action);
+                    return;
+                }
+            };
+            (*sender)
+                .send(event)
+                .expect("Failed to send window close event");
+        };
+    }
+}
+
+extern "C" fn mouse_button_callback(window: *mut GLFWwindow, button: i32, action: i32) {
+    unsafe {
+        if let Some(sender) = get_sender(window) {
+            // Convert button 0-5 to keycode which starts with mouse buttons after keyboard keys
+            let key =
+                KeyCode::from_i32(button + KeyCode::Mouse0 as i32).unwrap_or(KeyCode::Invalid);
+            let event = match action {
+                GLFW_PRESS => Event::KeyPress(key),
+                GLFW_RELEASE => Event::KeyRelease(key),
+                GLFW_REPEAT => Event::KeyRepeat(key),
+                _ => {
+                    warn!("Unknown key action {}", action);
+                    return;
+                }
+            };
+            (*sender)
+                .send(event)
                 .expect("Failed to send window close event");
         };
     }
