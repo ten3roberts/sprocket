@@ -1,7 +1,8 @@
 use super::glfw::*;
-
+use crate::event::Event;
 use log::{error, info};
 use std::ptr;
+use std::sync::mpsc;
 
 pub enum WindowMode {
     Windowed,
@@ -69,10 +70,23 @@ impl Window {
         unsafe {
             // Set callbacks
             glfwSetWindowCloseCallback(raw_window, close_callback);
-            // glfwSetWindowUserPointer(raw_window, &window as *mut ffi::c_void);
+            glfwSetWindowUserPointer(raw_window, ptr::null_mut());
         }
 
         window
+    }
+
+    pub fn set_event_sender(&mut self, sender: mpsc::Sender<Event>) {
+        unsafe {
+            glfwSetWindowUserPointer(
+                self.raw_window,
+                Box::into_raw(Box::new(sender)) as *mut std::ffi::c_void,
+            );
+        }
+    }
+
+    pub fn should_close(&self) -> bool {
+        unsafe { glfwWindowShouldClose(self.raw_window) != 0 }
     }
 
     pub fn process_events(&self) {
@@ -90,16 +104,40 @@ impl Window {
         self.height
     }
 }
+
+// Returns the sender from window user pointer
+unsafe fn get_sender(window: *mut GLFWwindow) -> Option<*mut mpsc::Sender<Event>> {
+    let sender = glfwGetWindowUserPointer(window) as *mut mpsc::Sender<Event>;
+
+    if sender == ptr::null_mut() {
+        error!("Invalid window event sender");
+        None
+    } else {
+        Some(&mut *sender)
+    }
+}
+
 #[no_mangle]
-extern "C" fn close_callback(_window: *mut GLFWwindow) {
-    // let window = unsafe {
-    //     let window = glfwGetWindowUserPointer(window) as *mut Window;
-    //     if window == ptr::null_mut() {
-    //         error!("Invalid window user pointer");
-    //         return;
-    //     } else {
-    //         &*window
-    //     }
-    // };
-    info!("Received close event for window");
+extern "C" fn close_callback(window: *mut GLFWwindow) {
+    unsafe {
+        if let Some(sender) = get_sender(window) {
+            (*sender)
+                .send(Event::WindowClose)
+                .expect("Failed to send window close event");
+        };
+    }
+}
+
+impl Drop for Window {
+    fn drop(&mut self) {
+        unsafe {
+            glfwDestroyWindow(self.raw_window);
+
+            // Reclaim event sender and drop it
+
+            if let Some(sender) = get_sender(self.raw_window) {
+                Box::from_raw(sender);
+            }
+        }
+    }
 }

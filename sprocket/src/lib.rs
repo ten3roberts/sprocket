@@ -1,4 +1,5 @@
 pub mod application;
+pub mod event;
 pub mod graphics;
 pub mod logger;
 pub mod math;

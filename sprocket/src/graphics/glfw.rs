@@ -15,6 +15,8 @@ extern "C" {
         monitor: *const ffi::c_void,
         share: *const ffi::c_void,
     ) -> *mut ffi::c_void;
+    pub fn glfwDestroyWindow(window: *mut GLFWwindow);
+    pub fn glfwWindowShouldClose(window: *mut GLFWwindow) -> i32;
     pub fn glfwPollEvents();
     pub fn glfwWindowHint(hint: i32, value: i32);
     pub fn glfwGetPrimaryMonitor() -> *const GLFWmonitor;
