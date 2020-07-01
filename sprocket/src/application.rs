@@ -1,5 +1,5 @@
 use crate::event::Event;
-use crate::graphics::window::Window;
+use crate::graphics::window::{Window, WindowMode};
 use log::info;
 use log::warn;
 use std::sync::mpsc;
@@ -18,6 +18,7 @@ impl Application {
     pub fn new(name: &str) -> Application {
         let (event_sender, event_receiver) = mpsc::channel::<Event>();
 
+        Window::init_glfw();
         Application {
             name: String::from(name),
             windows: Vec::new(),
@@ -26,8 +27,8 @@ impl Application {
         }
     }
 
-    pub fn add_window(&mut self, mut window: Window) {
-        window.set_event_sender(self.event_sender.clone());
+    pub fn add_window(&mut self, title: &str, width: i32, height: i32, mode: WindowMode) {
+        let window = Window::new(title, width, height, mode, self.event_sender.clone());
         self.windows.push(window);
     }
 
@@ -51,5 +52,11 @@ impl Application {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+}
+
+impl Drop for Application {
+    fn drop(&mut self) {
+        Window::terminate_glfw();
     }
 }
