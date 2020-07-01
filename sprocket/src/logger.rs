@@ -24,7 +24,7 @@ impl log::Log for Logger {
         };
 
         println!(
-            "[{}] {}: {}",
+            "[{}] {} - {}",
             level.to_string().color(color),
             record.target().split("::").last().unwrap_or("unknown"),
             record.args()
