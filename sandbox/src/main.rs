@@ -1,4 +1,3 @@
-use log::{debug, error, info, trace, warn};
 use sprocket::*;
 fn main() {
     let mut application = Application::new("Sandbox");
