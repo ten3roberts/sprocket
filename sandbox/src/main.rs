@@ -5,11 +5,8 @@ fn main() {
     info!("Created application {}", application.name());
 
     logger::init(log::LevelFilter::Trace);
-    Window::init_glfw();
-    let window = Window::new("Sandbox", 800, 600, WindowMode::Windowed);
-    info!("Window title '{}'", window.title());
 
-    application.add_window(window);
+    application.add_window("Sandbox", 800, 600, WindowMode::Windowed);
     application.run();
 
     info!("Terminating application");
