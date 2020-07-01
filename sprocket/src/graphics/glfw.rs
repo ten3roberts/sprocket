@@ -7,6 +7,7 @@ use std::ffi;
 #[no_mangle]
 extern "C" {
     pub fn glfwInit() -> i32;
+    pub fn glfwTerminate();
     pub fn glfwGetVersion(major: *mut i32, minor: *mut i32, rev: *mut i32);
     pub fn glfwCreateWindow(
         width: i32,

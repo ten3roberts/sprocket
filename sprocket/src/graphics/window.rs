@@ -1,7 +1,7 @@
 use super::glfw::*;
 use crate::event::Event;
 use crate::event::KeyCode;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use std::ptr;
 use std::sync::mpsc;
 
@@ -12,17 +12,24 @@ pub enum WindowMode {
     Borderless,
     Fullscreen,
 }
+/// This is the userpointer given to the data
+/// Needs to be separate so that the address is known and not moved
+struct WindowData {
+    sender: mpsc::Sender<Event>,
+    in_focus: bool,
+    width: i32,
+    height: i32,
+}
 
 pub struct Window {
     title: String,
-    width: i32,
-    height: i32,
     raw_window: *mut GLFWwindow,
+    data: *mut WindowData,
 }
 
 impl Window {
     pub fn init_glfw() {
-        info!("Initializing glfw");
+        debug!("Initializing glfw");
 
         unsafe {
             if glfwInit() != 1 {
@@ -36,10 +43,24 @@ impl Window {
         }
     }
 
+    pub fn terminate_glfw() {
+        debug!("Terminating glfw");
+
+        unsafe {
+            glfwTerminate();
+        }
+    }
+
     /// Creates a new window with specified title, width, height, and mode
     /// Mode specified if the window is normal windowed, fullscreen or borderless
     /// if any dimension is -1, it will be set to the native resolution
-    pub fn new(title: &str, mut width: i32, mut height: i32, mode: WindowMode) -> Window {
+    pub fn new(
+        title: &str,
+        mut width: i32,
+        mut height: i32,
+        mode: WindowMode,
+        sender: mpsc::Sender<Event>,
+    ) -> Window {
         let mut monitor: *const GLFWmonitor = ptr::null();
         let raw_window = unsafe {
             let primary = glfwGetPrimaryMonitor();
@@ -68,13 +89,17 @@ impl Window {
 
         let window = Window {
             title: String::from(title),
-            width,
-            height,
             raw_window,
+            data: Box::into_raw(Box::new(WindowData {
+                width,
+                height,
+                sender: sender,
+                in_focus: false,
+            })),
         };
 
         unsafe {
-            glfwSetWindowUserPointer(raw_window, ptr::null_mut());
+            glfwSetWindowUserPointer(raw_window, window.data as *mut std::ffi::c_void);
             // Set callbacks
             glfwSetWindowCloseCallback(raw_window, close_callback);
             glfwSetKeyCallback(raw_window, key_callback);
@@ -89,21 +114,16 @@ impl Window {
         window
     }
 
-    pub fn set_event_sender(&mut self, sender: mpsc::Sender<Event>) {
-        unsafe {
-            glfwSetWindowUserPointer(
-                self.raw_window,
-                Box::into_raw(Box::new(sender)) as *mut std::ffi::c_void,
-            );
-        }
+    pub fn process_events(&self) {
+        unsafe { glfwPollEvents() };
+    }
+
+    pub fn in_focus(&self) -> bool {
+        unsafe { (*self.data).in_focus }
     }
 
     pub fn should_close(&self) -> bool {
         unsafe { glfwWindowShouldClose(self.raw_window) != 0 }
-    }
-
-    pub fn process_events(&self) {
-        unsafe { glfwPollEvents() };
     }
 
     pub fn title(&self) -> &str {
@@ -111,30 +131,31 @@ impl Window {
     }
 
     pub fn width(&self) -> i32 {
-        self.width
+        unsafe { (*self.data).width }
     }
+
     pub fn height(&self) -> i32 {
-        self.height
+        unsafe { (*self.data).height }
     }
 }
 
 // Returns the sender from window user pointer
-unsafe fn get_sender(window: *mut GLFWwindow) -> Option<*mut mpsc::Sender<Event>> {
-    let sender = glfwGetWindowUserPointer(window) as *mut mpsc::Sender<Event>;
+unsafe fn get_data(window: *mut GLFWwindow) -> Option<*mut WindowData> {
+    let data = glfwGetWindowUserPointer(window) as *mut WindowData;
 
-    if sender == ptr::null_mut() {
+    if data == ptr::null_mut() {
         error!("Invalid window event sender");
-        None
-    } else {
-        Some(&mut *sender)
+        return None;
     }
+    Some(data)
 }
 
 #[no_mangle]
 extern "C" fn close_callback(window: *mut GLFWwindow) {
     unsafe {
-        if let Some(sender) = get_sender(window) {
-            (*sender)
+        if let Some(data) = get_data(window) {
+            (*data)
+                .sender
                 .send(Event::WindowClose)
                 .expect("Failed to send window close event");
         };
@@ -149,7 +170,7 @@ extern "C" fn key_callback(
     _mods: i32,
 ) {
     unsafe {
-        if let Some(sender) = get_sender(window) {
+        if let Some(data) = get_data(window) {
             let key = KeyCode::from_i32(key).unwrap_or(KeyCode::Invalid);
             let event = match action {
                 GLFW_PRESS => Event::KeyPress(key),
@@ -160,7 +181,8 @@ extern "C" fn key_callback(
                     return;
                 }
             };
-            (*sender)
+            (*data)
+                .sender
                 .send(event)
                 .expect("Failed to send window close event");
         };
@@ -169,7 +191,7 @@ extern "C" fn key_callback(
 #[no_mangle]
 extern "C" fn mouse_button_callback(window: *mut GLFWwindow, button: i32, action: i32) {
     unsafe {
-        if let Some(sender) = get_sender(window) {
+        if let Some(data) = get_data(window) {
             // Convert button 0-5 to keycode which starts with mouse buttons after keyboard keys
             let key =
                 KeyCode::from_i32(button + KeyCode::Mouse0 as i32).unwrap_or(KeyCode::Invalid);
@@ -182,7 +204,8 @@ extern "C" fn mouse_button_callback(window: *mut GLFWwindow, button: i32, action
                     return;
                 }
             };
-            (*sender)
+            (*data)
+                .sender
                 .send(event)
                 .expect("Failed to send window close event");
         };
@@ -191,10 +214,11 @@ extern "C" fn mouse_button_callback(window: *mut GLFWwindow, button: i32, action
 #[no_mangle]
 extern "C" fn scroll_callback(window: *mut GLFWwindow, xoffset: f64, yoffset: f64) {
     unsafe {
-        if let Some(sender) = get_sender(window) {
+        if let Some(data) = get_data(window) {
             // Convert button 0-5 to keycode which starts with mouse buttons after keyboard keys
 
-            (*sender)
+            (*data)
+                .sender
                 .send(Event::Scroll(xoffset as i32, yoffset as i32))
                 .expect("Failed to send window close event");
         };
@@ -203,8 +227,9 @@ extern "C" fn scroll_callback(window: *mut GLFWwindow, xoffset: f64, yoffset: f6
 #[no_mangle]
 extern "C" fn mouse_position_callback(window: *mut GLFWwindow, xpos: f64, ypos: f64) {
     unsafe {
-        if let Some(sender) = get_sender(window) {
-            (*sender)
+        if let Some(data) = get_data(window) {
+            (*data)
+                .sender
                 .send(Event::MousePosition(xpos as i32, ypos as i32))
                 .expect("Failed to send window close event");
         };
@@ -213,8 +238,11 @@ extern "C" fn mouse_position_callback(window: *mut GLFWwindow, xpos: f64, ypos: 
 #[no_mangle]
 extern "C" fn window_size_callback(window: *mut GLFWwindow, width: i32, height: i32) {
     unsafe {
-        if let Some(sender) = get_sender(window) {
-            (*sender)
+        if let Some(data) = get_data(window) {
+            (*data).width = width;
+            (*data).height = height;
+            (*data)
+                .sender
                 .send(Event::WindowResize(width, height))
                 .expect("Failed to send window close event");
         };
@@ -223,8 +251,10 @@ extern "C" fn window_size_callback(window: *mut GLFWwindow, width: i32, height: 
 #[no_mangle]
 extern "C" fn window_focus_callback(window: *mut GLFWwindow, focus: i32) {
     unsafe {
-        if let Some(sender) = get_sender(window) {
-            (*sender)
+        if let Some(data) = get_data(window) {
+            (*data).in_focus = focus != 0;
+            (*data)
+                .sender
                 .send(Event::WindowFocus(focus != 0))
                 .expect("Failed to send window close event");
         };
@@ -232,8 +262,9 @@ extern "C" fn window_focus_callback(window: *mut GLFWwindow, focus: i32) {
 }
 extern "C" fn char_callback(window: *mut GLFWwindow, codepoint: u32) {
     unsafe {
-        if let Some(sender) = get_sender(window) {
-            (*sender)
+        if let Some(data) = get_data(window) {
+            (*data)
+                .sender
                 .send(Event::CharacterType(
                     std::char::from_u32(codepoint).unwrap_or('\u{fffd}'),
                 ))
@@ -249,8 +280,8 @@ impl Drop for Window {
 
             // Reclaim event sender and drop it
 
-            if let Some(sender) = get_sender(self.raw_window) {
-                Box::from_raw(sender);
+            if let Some(data) = get_data(self.raw_window) {
+                Box::from_raw(data);
             }
         }
     }
