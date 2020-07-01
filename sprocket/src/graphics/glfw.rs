@@ -68,6 +68,9 @@ extern "C" {
         window: *mut GLFWwindow,
         callback: extern "C" fn(window: *mut GLFWwindow, codepoint: u32),
     );
+
+    // Vulkan
+    pub fn glfwGetRequiredInstanceExtensions(count: *mut u32) -> *const *const i8;
 }
 
 pub type GLFWwindow = ffi::c_void;

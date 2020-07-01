@@ -12,3 +12,6 @@ colorful = "0.2.1"
 # For converting integers to enums
 num-traits = "0.2"
 num-derive = "0.2"
+
+# Vulkan wrapper
+ash = "0.31.0"
