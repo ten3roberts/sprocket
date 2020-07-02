@@ -13,6 +13,8 @@ pub struct VulkanContext {
     instance: ash::Instance,
     debug_messenger: vk::DebugUtilsMessengerEXT,
     surface: vk::SurfaceKHR,
+    device: ash::Device,
+    graphics_queue: ash::vk::Queue,
 }
 
 pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
@@ -65,11 +67,14 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
             .expect("Couldn't find suitable device.");
 
         let device = create_device(&instance, pdevice, queue_family_index)?;
+        let graphics_queue = device.get_device_queue(queue_family_index, 0);
         Ok(VulkanContext {
             entry,
             instance,
             debug_messenger,
             surface,
+            device,
+            graphics_queue,
         })
     }
 
