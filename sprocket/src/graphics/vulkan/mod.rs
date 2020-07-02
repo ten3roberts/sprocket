@@ -19,10 +19,7 @@ pub struct VulkanContext {
 
 pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
     unsafe {
-        let entry = match Entry::new() {
-            Ok(entry) => entry,
-            Err(e) => return errfmt!("Failed to create vulkan entry {}", e),
-        };
+        let entry = unwrap_or_return!("Failed to create vulkan entry", Entry::new());
 
         let validation_layers = ["VK_LAYER_KHRONOS_validation"];
 
@@ -37,7 +34,7 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
         let pdevices = instance.enumerate_physical_devices().unwrap_or(Vec::new());
         let surface_loader = Surface::new(&entry, &instance);
 
-        let (pdevice, queue_family_index) = pdevices
+        let (pdevice, queue_family_index) = match pdevices
             .iter()
             .map(|pdevice| {
                 instance
@@ -53,7 +50,7 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
                                         index as u32,
                                         surface,
                                     )
-                                    .unwrap();
+                                    .expect("Failed to get device capabilities");
                         if supports_graphic_and_surface {
                             Some((*pdevice, index as u32))
                         } else {
@@ -64,7 +61,10 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
             })
             .filter_map(|v| v)
             .next()
-            .expect("Couldn't find suitable device.");
+        {
+            Some(v) => v,
+            None => return errfmt!("Failed to find supported physical device"),
+        };
 
         let device = create_device(&instance, pdevice, queue_family_index)?;
         let graphics_queue = device.get_device_queue(queue_family_index, 0);
@@ -87,7 +87,7 @@ unsafe fn create_instance(
     entry: &ash::Entry,
     layers: &[&str],
 ) -> Result<ash::Instance, Cow<'static, str>> {
-    let app_name = CString::new("VulkanTriangle").unwrap();
+    let app_name = CString::new("Sprocket").unwrap();
     let app_info = vk::ApplicationInfo::builder()
         .application_name(&app_name)
         .application_version(0)
@@ -120,20 +120,21 @@ unsafe fn create_instance(
         .application_info(&app_info)
         .enabled_layer_names(&layers)
         .enabled_extension_names(&extensions);
-    match entry.create_instance(&create_info, None) {
-        Ok(instance) => Ok(instance),
-        Err(e) => errfmt!("Failed to create instance {}", e),
-    }
+    unwrap_and_return!(
+        "Failed to create instance",
+        entry.create_instance(&create_info, None)
+    )
 }
 
 fn check_validation_layer_support(
     entry: &ash::Entry,
     layers: &[&str],
 ) -> Result<(), Cow<'static, str>> {
-    let available_layers = match entry.enumerate_instance_layer_properties() {
-        Ok(layers) => layers,
-        Err(e) => return errfmt!("Could not enumerate supported layers {}", e),
-    };
+    let available_layers = unwrap_or_return!(
+        "Could not enumerate supported layers",
+        entry.enumerate_instance_layer_properties()
+    );
+
     let available_layers: Vec<&CStr> = available_layers
         .iter()
         .map(|layer| unsafe { CStr::from_ptr(layer.layer_name.as_ptr()) })
@@ -176,10 +177,10 @@ fn create_debug_messenger(
 
     unsafe {
         let debug_utils = ash::extensions::ext::DebugUtils::new(entry, instance);
-        match debug_utils.create_debug_utils_messenger(&create_info, None) {
-            Ok(messenger) => Ok(messenger),
-            Err(e) => errfmt!("Failed to create debug utils messenger {}", e),
-        }
+        unwrap_and_return!(
+            "Failed to create debug utils messenger",
+            debug_utils.create_debug_utils_messenger(&create_info, None)
+        )
     }
 }
 
@@ -223,10 +224,10 @@ unsafe fn create_device(
         .queue_create_infos(&queue_info)
         .enabled_features(&features);
 
-    match instance.create_device(pdevice, &device_create_info, None) {
-        Ok(device) => Ok(device),
-        Err(e) => errfmt!("Failed to create logical device {}", e),
-    }
+    unwrap_and_return!(
+        "Failed to create logical device",
+        instance.create_device(pdevice, &device_create_info, None)
+    )
 }
 impl Drop for VulkanContext {
     fn drop(&mut self) {

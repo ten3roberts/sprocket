@@ -33,7 +33,7 @@ impl Application {
         self.graphics_context = match graphics::init(graphics::Api::Vulkan, &self.windows[0]) {
             Ok(context) => Some(context),
             Err(msg) => {
-                error!("Failed to initialize graphics {}", msg);
+                error!("Failed to initialize graphics '{}'", msg);
                 None
             }
         };
