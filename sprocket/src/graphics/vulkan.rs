@@ -1,11 +1,12 @@
 use crate::graphics::glfw;
 use crate::*;
 use ash::{version::EntryV1_0, vk, Entry};
-use std::ffi::CStr;
-use std::ffi::CString;
+use std::ffi::{c_void, CStr, CString};
+
 pub struct VulkanContext {
     entry: ash::Entry,
     instance: ash::Instance,
+    debug_messenger: vk::DebugUtilsMessengerEXT,
 }
 
 pub fn init() -> Result<VulkanContext, String> {
@@ -20,7 +21,12 @@ pub fn init() -> Result<VulkanContext, String> {
     check_validation_layer_support(&entry, &validation_layers)?;
     let instance = create_instance(&entry, &validation_layers)?;
 
-    Ok(VulkanContext { entry, instance })
+    let debug_messenger = create_debug_messenger(&entry, &instance)?;
+    Ok(VulkanContext {
+        entry,
+        instance,
+        debug_messenger,
+    })
 }
 
 fn create_instance(entry: &ash::Entry, layers: &[&str]) -> Result<ash::Instance, String> {
@@ -96,8 +102,56 @@ fn check_validation_layer_support(entry: &ash::Entry, layers: &[&str]) -> Result
     Ok(())
 }
 
+fn create_debug_messenger(
+    entry: &ash::Entry,
+    instance: &ash::Instance,
+) -> Result<vk::DebugUtilsMessengerEXT, String> {
+    let create_info = vk::DebugUtilsMessengerCreateInfoEXT {
+        s_type: vk::StructureType::DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+        message_severity: vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE
+            | vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
+            | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
+        message_type: vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
+            | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION
+            | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE,
+        pfn_user_callback: Some(debug_callback),
+        p_user_data: std::ptr::null_mut(),
+        p_next: std::ptr::null(),
+        flags: vk::DebugUtilsMessengerCreateFlagsEXT::default(),
+    };
+
+    unsafe {
+        let debug_utils = ash::extensions::ext::DebugUtils::new(entry, instance);
+        match debug_utils.create_debug_utils_messenger(&create_info, None) {
+            Ok(messenger) => Ok(messenger),
+            Err(e) => errfmt!("Failed to create debug utils messenger {}", e),
+        }
+    }
+}
+
 impl Drop for VulkanContext {
     fn drop(&mut self) {
         info!("Dropping vulkan context");
     }
+}
+
+#[no_mangle]
+unsafe extern "system" fn debug_callback(
+    message_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
+    _message_types: vk::DebugUtilsMessageTypeFlagsEXT,
+    p_callback_data: *const vk::DebugUtilsMessengerCallbackDataEXT,
+    _p_user_data: *mut c_void,
+) -> vk::Bool32 {
+    let message = CStr::from_ptr((*p_callback_data).p_message);
+    match message_severity {
+        vk::DebugUtilsMessageSeverityFlagsEXT::ERROR => error!("{:?}", message),
+        vk::DebugUtilsMessageSeverityFlagsEXT::WARNING => warn!("{:?}", message),
+        vk::DebugUtilsMessageSeverityFlagsEXT::INFO => info!("{:?}", message),
+        vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE => info!(
+            "VERBOSE: {:?}",
+            CStr::from_ptr((*p_callback_data).p_message)
+        ),
+        _ => info!("Other: {:?}", message),
+    }
+    vk::FALSE
 }
