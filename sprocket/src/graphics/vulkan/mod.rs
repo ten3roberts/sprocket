@@ -2,6 +2,7 @@
 use crate::graphics::glfw;
 use crate::*;
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::ffi::{c_void, CStr, CString};
 use std::ptr;
 
@@ -14,7 +15,54 @@ pub struct VulkanContext {
     debug_messenger: vk::DebugUtilsMessengerEXT,
     surface: vk::SurfaceKHR,
     device: ash::Device,
-    graphics_queue: ash::vk::Queue,
+    graphics_queue: vk::Queue,
+    present_queue: vk::Queue,
+}
+
+struct QueueFamilies {
+    graphics: Option<u32>,
+    present: Option<u32>,
+    compute: Option<u32>,
+    present_support: bool,
+}
+
+impl QueueFamilies {
+    unsafe fn find(
+        instance: &ash::Instance,
+        physical_device: vk::PhysicalDevice,
+        surface_loader: &Surface,
+        surface: vk::SurfaceKHR,
+    ) -> QueueFamilies {
+        let families = instance.get_physical_device_queue_family_properties(physical_device);
+        let mut graphics_family = None;
+        let mut presentation_family = None;
+        let mut compute_family = None;
+        let mut present_support = false;
+        for (i, family) in families.iter().enumerate() {
+            if family.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
+                graphics_family = Some(i as u32);
+            }
+            if surface_loader
+                .get_physical_device_surface_support(physical_device, i as u32, surface)
+                .unwrap_or(false)
+            {
+                presentation_family = Some(i as u32);
+                present_support = surface_loader
+                    .get_physical_device_surface_support(physical_device, i as u32, surface)
+                    .unwrap_or(false);
+            }
+            if family.queue_flags.contains(vk::QueueFlags::COMPUTE) {
+                compute_family = Some(i as u32);
+            }
+        }
+
+        QueueFamilies {
+            graphics: graphics_family,
+            present: presentation_family,
+            compute: compute_family,
+            present_support,
+        }
+    }
 }
 
 pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
@@ -28,46 +76,16 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
         let instance = create_instance(&entry, &validation_layers)?;
 
         let debug_messenger = create_debug_messenger(&entry, &instance)?;
-        let surface = create_surface(&entry, &instance, &window)?;
+        let surface = create_surface(&instance, &window)?;
         // Choose physical devices
 
-        let pdevices = instance.enumerate_physical_devices().unwrap_or(Vec::new());
         let surface_loader = Surface::new(&entry, &instance);
+        let (physical_device, queue_families) =
+            find_physical_device(&instance, &surface_loader, surface)?;
 
-        let (pdevice, queue_family_index) = match pdevices
-            .iter()
-            .map(|pdevice| {
-                instance
-                    .get_physical_device_queue_family_properties(*pdevice)
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, ref info)| {
-                        let supports_graphic_and_surface =
-                            info.queue_flags.contains(vk::QueueFlags::GRAPHICS)
-                                && surface_loader
-                                    .get_physical_device_surface_support(
-                                        *pdevice,
-                                        index as u32,
-                                        surface,
-                                    )
-                                    .expect("Failed to get device capabilities");
-                        if supports_graphic_and_surface {
-                            Some((*pdevice, index as u32))
-                        } else {
-                            None
-                        }
-                    })
-                    .next()
-            })
-            .filter_map(|v| v)
-            .next()
-        {
-            Some(v) => v,
-            None => return errfmt!("Failed to find supported physical device"),
-        };
-
-        let device = create_device(&instance, pdevice, queue_family_index)?;
-        let graphics_queue = device.get_device_queue(queue_family_index, 0);
+        let device = create_device(&instance, physical_device, &queue_families)?;
+        let graphics_queue = device.get_device_queue(queue_families.graphics.unwrap(), 0);
+        let present_queue = device.get_device_queue(queue_families.present.unwrap(), 0);
         Ok(VulkanContext {
             entry,
             instance,
@@ -75,6 +93,7 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
             surface,
             device,
             graphics_queue,
+            present_queue,
         })
     }
 
@@ -185,7 +204,6 @@ fn create_debug_messenger(
 }
 
 unsafe fn create_surface(
-    entry: &ash::Entry,
     instance: &ash::Instance,
     window: &Window,
 ) -> Result<vk::SurfaceKHR, Cow<'static, str>> {
@@ -204,24 +222,102 @@ unsafe fn create_surface(
     }
     Ok(vk::SurfaceKHR::from_raw(surface_handle))
 }
+
+unsafe fn rate_device(
+    instance: &ash::Instance,
+    device: &vk::PhysicalDevice,
+    surface_loader: &Surface,
+    surface: vk::SurfaceKHR,
+) -> u32 {
+    let mut score = 1;
+    let properties = instance.get_physical_device_properties(*device);
+    // let features = instance.get_physical_device_features(*device);
+
+    let queue_families = QueueFamilies::find(instance, *device, surface_loader, surface);
+
+    if let None = queue_families.graphics {
+        return 0;
+    }
+    if let None = queue_families.present {
+        return 0;
+    }
+
+    if queue_families.present_support == false {
+        return 0;
+    }
+
+    if properties.device_type == vk::PhysicalDeviceType::DISCRETE_GPU {
+        score += 500
+    };
+
+    score += properties.limits.max_framebuffer_height / 10;
+    score += properties.limits.max_framebuffer_width / 10;
+    score += properties.limits.max_image_dimension2_d / 10;
+    score += properties.limits.max_color_attachments;
+    score
+}
+
+unsafe fn find_physical_device(
+    instance: &ash::Instance,
+    surface_loader: &Surface,
+    surface: vk::SurfaceKHR,
+) -> Result<(vk::PhysicalDevice, QueueFamilies), Cow<'static, str>> {
+    let devices = instance.enumerate_physical_devices().unwrap_or(Vec::new());
+
+    let best_device = match devices
+        .iter()
+        .zip(
+            devices
+                .iter()
+                .map(|device| rate_device(instance, device, surface_loader, surface)),
+        )
+        .filter(|(_, score)| *score > 0)
+        .max_by(|(_, prev_score), (_, score)| score.cmp(prev_score))
+    {
+        Some(device) => device,
+        None => return Err("Unable to find suitable GPU".into()),
+    };
+
+    let device_properties = instance.get_physical_device_properties(*best_device.0);
+    info!(
+        "Using device {:?}",
+        CStr::from_ptr(device_properties.device_name.as_ptr())
+    );
+
+    Ok((
+        *best_device.0,
+        QueueFamilies::find(instance, *best_device.0, surface_loader, surface),
+    ))
+}
+
 unsafe fn create_device(
     instance: &ash::Instance,
     pdevice: vk::PhysicalDevice,
-    queue_family_index: u32,
+    queue_families: &QueueFamilies,
 ) -> Result<ash::Device, Cow<'static, str>> {
     let priorities = [1.0];
 
-    let queue_info = [vk::DeviceQueueCreateInfo::builder()
-        .queue_family_index(queue_family_index)
-        .queue_priorities(&priorities)
-        .build()];
+    let mut queue_infos = Vec::new();
+
+    let mut unique_families = HashSet::new();
+    unique_families.insert(queue_families.graphics.unwrap());
+    unique_families.insert(queue_families.present.unwrap());
+    debug!("Unique queue families {}", unique_families.len());
+
+    for queue_family in unique_families {
+        let queue_info = vk::DeviceQueueCreateInfo::builder()
+            .queue_family_index(queue_family)
+            .queue_priorities(&priorities)
+            .build();
+        queue_infos.push(queue_info);
+    }
 
     let features = vk::PhysicalDeviceFeatures {
         shader_clip_distance: 1,
         ..Default::default()
     };
     let device_create_info = vk::DeviceCreateInfo::builder()
-        .queue_create_infos(&queue_info)
+        .queue_create_infos(&queue_infos)
         .enabled_features(&features);
 
     unwrap_and_return!(
