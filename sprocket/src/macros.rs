@@ -1,6 +1,6 @@
 #[macro_use]
 macro_rules! errfmt {
     ($($arg:tt)*) => ({
-        Err(format!($($arg)*))
+        Err(format!($($arg)*).into())
     })
 }

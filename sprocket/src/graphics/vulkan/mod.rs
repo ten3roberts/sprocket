@@ -1,9 +1,11 @@
 #![allow(dead_code)]
 use crate::graphics::glfw;
 use crate::*;
+use std::borrow::Cow;
 use std::ffi::{c_void, CStr, CString};
 use std::ptr;
 
+use ash::extensions::khr::Surface;
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
 use ash::{vk, vk::Handle, Device, Entry, Instance};
 pub struct VulkanContext {
@@ -13,7 +15,7 @@ pub struct VulkanContext {
     surface: vk::SurfaceKHR,
 }
 
-pub fn init(window: &Window) -> Result<VulkanContext, String> {
+pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
     unsafe {
         let entry = match Entry::new() {
             Ok(entry) => entry,
@@ -29,13 +31,40 @@ pub fn init(window: &Window) -> Result<VulkanContext, String> {
         let debug_messenger = create_debug_messenger(&entry, &instance)?;
         let surface = create_surface(&entry, &instance, &window)?;
         // Choose physical devices
-        let physical_devices = match instance.enumerate_physical_devices() {
-            Ok(devices) => devices,
-            Err(e) => return errfmt!("Failed to enumerate physical devices {}", e),
-        };
 
-        // Create surface
+        let pdevices = instance.enumerate_physical_devices().unwrap_or(Vec::new());
+        let surface_loader = Surface::new(&entry, &instance);
 
+        let (pdevice, queue_family_index) = pdevices
+            .iter()
+            .map(|pdevice| {
+                instance
+                    .get_physical_device_queue_family_properties(*pdevice)
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, ref info)| {
+                        let supports_graphic_and_surface =
+                            info.queue_flags.contains(vk::QueueFlags::GRAPHICS)
+                                && surface_loader
+                                    .get_physical_device_surface_support(
+                                        *pdevice,
+                                        index as u32,
+                                        surface,
+                                    )
+                                    .unwrap();
+                        if supports_graphic_and_surface {
+                            Some((*pdevice, index as u32))
+                        } else {
+                            None
+                        }
+                    })
+                    .next()
+            })
+            .filter_map(|v| v)
+            .next()
+            .expect("Couldn't find suitable device.");
+
+        let device = create_device(&instance, pdevice, queue_family_index)?;
         Ok(VulkanContext {
             entry,
             instance,
@@ -49,7 +78,10 @@ pub fn init(window: &Window) -> Result<VulkanContext, String> {
     //
 }
 
-unsafe fn create_instance(entry: &ash::Entry, layers: &[&str]) -> Result<ash::Instance, String> {
+unsafe fn create_instance(
+    entry: &ash::Entry,
+    layers: &[&str],
+) -> Result<ash::Instance, Cow<'static, str>> {
     let app_name = CString::new("VulkanTriangle").unwrap();
     let app_info = vk::ApplicationInfo::builder()
         .application_name(&app_name)
@@ -89,7 +121,10 @@ unsafe fn create_instance(entry: &ash::Entry, layers: &[&str]) -> Result<ash::In
     }
 }
 
-fn check_validation_layer_support(entry: &ash::Entry, layers: &[&str]) -> Result<(), String> {
+fn check_validation_layer_support(
+    entry: &ash::Entry,
+    layers: &[&str],
+) -> Result<(), Cow<'static, str>> {
     let available_layers = match entry.enumerate_instance_layer_properties() {
         Ok(layers) => layers,
         Err(e) => return errfmt!("Could not enumerate supported layers {}", e),
@@ -119,7 +154,7 @@ fn check_validation_layer_support(entry: &ash::Entry, layers: &[&str]) -> Result
 fn create_debug_messenger(
     entry: &ash::Entry,
     instance: &ash::Instance,
-) -> Result<vk::DebugUtilsMessengerEXT, String> {
+) -> Result<vk::DebugUtilsMessengerEXT, Cow<'static, str>> {
     let create_info = vk::DebugUtilsMessengerCreateInfoEXT {
         s_type: vk::StructureType::DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
         message_severity: vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE
@@ -147,7 +182,7 @@ unsafe fn create_surface(
     entry: &ash::Entry,
     instance: &ash::Instance,
     window: &Window,
-) -> Result<vk::SurfaceKHR, String> {
+) -> Result<vk::SurfaceKHR, Cow<'static, str>> {
     let raw_window = window.get_raw();
     let mut surface_handle = 0;
     let instance = instance.handle();
@@ -163,7 +198,31 @@ unsafe fn create_surface(
     }
     Ok(vk::SurfaceKHR::from_raw(surface_handle))
 }
+unsafe fn create_device(
+    instance: &ash::Instance,
+    pdevice: vk::PhysicalDevice,
+    queue_family_index: u32,
+) -> Result<ash::Device, Cow<'static, str>> {
+    let priorities = [1.0];
 
+    let queue_info = [vk::DeviceQueueCreateInfo::builder()
+        .queue_family_index(queue_family_index)
+        .queue_priorities(&priorities)
+        .build()];
+
+    let features = vk::PhysicalDeviceFeatures {
+        shader_clip_distance: 1,
+        ..Default::default()
+    };
+    let device_create_info = vk::DeviceCreateInfo::builder()
+        .queue_create_infos(&queue_info)
+        .enabled_features(&features);
+
+    match instance.create_device(pdevice, &device_create_info, None) {
+        Ok(device) => Ok(device),
+        Err(e) => errfmt!("Failed to create logical device {}", e),
+    }
+}
 impl Drop for VulkanContext {
     fn drop(&mut self) {
         info!("Dropping vulkan context");
