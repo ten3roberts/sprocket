@@ -1,7 +1,9 @@
 use crate::graphics::glfw;
 use crate::*;
-use ash::{version::EntryV1_0, vk, Entry};
 use std::ffi::{c_void, CStr, CString};
+
+pub use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
+use ash::{vk, Device, Entry, Instance};
 
 pub struct VulkanContext {
     entry: ash::Entry,
@@ -10,49 +12,63 @@ pub struct VulkanContext {
 }
 
 pub fn init() -> Result<VulkanContext, String> {
-    let entry = match Entry::new() {
-        Ok(entry) => entry,
-        Err(e) => return errfmt!("Failed to create vulkan entry {}", e),
-    };
+    unsafe {
+        let entry = match Entry::new() {
+            Ok(entry) => entry,
+            Err(e) => return errfmt!("Failed to create vulkan entry {}", e),
+        };
 
-    let validation_layers = ["VK_LAYER_KHRONOS_validation"];
+        let validation_layers = ["VK_LAYER_KHRONOS_validation"];
 
-    // Ensure all requested layers exist
-    check_validation_layer_support(&entry, &validation_layers)?;
-    let instance = create_instance(&entry, &validation_layers)?;
+        // Ensure all requested layers exist
+        check_validation_layer_support(&entry, &validation_layers)?;
+        let instance = create_instance(&entry, &validation_layers)?;
 
-    let debug_messenger = create_debug_messenger(&entry, &instance)?;
-    Ok(VulkanContext {
-        entry,
-        instance,
-        debug_messenger,
-    })
+        let debug_messenger = create_debug_messenger(&entry, &instance)?;
+        let pdevices = instance
+            .enumerate_physical_devices()
+            .expect("Physical device error");
+
+        Ok(VulkanContext {
+            entry,
+            instance,
+            debug_messenger,
+        })
+    }
+
+    // // Find physical devices
+    // let pdevices = instance..enumerate_physical_devices()?;
+    //
 }
 
-fn create_instance(entry: &ash::Entry, layers: &[&str]) -> Result<ash::Instance, String> {
-    let app_info = vk::ApplicationInfo {
+unsafe fn create_instance(entry: &ash::Entry, layers: &[&str]) -> Result<ash::Instance, String> {
+    let app_name = CString::new("VulkanTriangle").unwrap();
+    let app_info = vk::ApplicationInfo::builder()
+        .application_name(&app_name)
+        .application_version(0)
+        .engine_name(&app_name)
+        .engine_version(0)
+        .api_version(vk::make_version(1, 0, 0));
+
+    let appinfo = vk::ApplicationInfo {
         api_version: vk::make_version(1, 0, 0),
         ..Default::default()
     };
 
     // Extension support
     let mut glfw_extension_count = 0;
-    let glfw_extensions =
-        unsafe { glfw::glfwGetRequiredInstanceExtensions(&mut glfw_extension_count) };
+    let glfw_extensions = glfw::glfwGetRequiredInstanceExtensions(&mut glfw_extension_count);
 
     let mut extensions = Vec::with_capacity(glfw_extension_count as usize);
-    unsafe {
-        for i in 0..glfw_extension_count {
-            let extension = *glfw_extensions.offset(i as isize);
-            extensions.push(extension);
-        }
-        extensions.push(b"VK_EXT_debug_utils\0".as_ptr() as *const i8);
+    for i in 0..glfw_extension_count {
+        let extension = *glfw_extensions.offset(i as isize);
+        extensions.push(extension);
     }
+    extensions.push(b"VK_EXT_debug_utils\0".as_ptr() as *const i8);
 
     info!("Extensions: {:?}", extensions);
 
     // Convert the slice to *const *const null terminated
-    let layer_count = layers.len();
     let layers: Vec<CString> = layers
         .iter()
         .map(|layer| CString::new(*layer).expect("Failed to convert layer to c_str"))
@@ -60,18 +76,13 @@ fn create_instance(entry: &ash::Entry, layers: &[&str]) -> Result<ash::Instance,
 
     let layers: Vec<*const i8> = layers.iter().map(|layer| layer.as_ptr()).collect();
 
-    let create_info = vk::InstanceCreateInfo {
-        p_application_info: &app_info,
-        enabled_extension_count: extensions.len() as u32,
-        pp_enabled_extension_names: extensions.as_ptr(),
-        pp_enabled_layer_names: layers.as_ptr(),
-        enabled_layer_count: layer_count as u32,
-        ..Default::default()
-    };
-    let instance = unsafe { entry.create_instance(&create_info, None) };
-    match instance {
+    let create_info = vk::InstanceCreateInfo::builder()
+        .application_info(&appinfo)
+        .enabled_layer_names(&layers)
+        .enabled_extension_names(&extensions);
+    match entry.create_instance(&create_info, None) {
         Ok(instance) => Ok(instance),
-        Err(e) => errfmt!("Failed to create vulkan instance {}", e),
+        Err(e) => errfmt!("Failed to create instance {}", e),
     }
 }
 
