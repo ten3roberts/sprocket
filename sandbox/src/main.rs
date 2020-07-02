@@ -4,10 +4,10 @@ fn main() {
     info!("Created application {}", application.name());
 
     logger::init(log::LevelFilter::Trace);
-    application.init();
 
     application.add_window("Sandbox", 800, 600, WindowMode::Windowed);
 
+    application.init_graphics();
     application.run();
 
     info!("Terminating application");

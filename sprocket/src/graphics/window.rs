@@ -137,6 +137,9 @@ impl Window {
     pub fn height(&self) -> i32 {
         unsafe { (*self.data).height }
     }
+    pub unsafe fn get_raw(&self) -> *const GLFWwindow {
+        self.raw_window
+    }
 }
 
 // Returns the sender from window user pointer

@@ -71,6 +71,12 @@ extern "C" {
 
     // Vulkan
     pub fn glfwGetRequiredInstanceExtensions(count: *mut u32) -> *const *const i8;
+    pub fn glfwCreateWindowSurface(
+        instance_handle: u64,
+        window: *const GLFWwindow,
+        allocator_callbacks: *const ffi::c_void,
+        surface_handle: *mut u64,
+    ) -> ash::vk::Result;
 }
 
 pub type GLFWwindow = ffi::c_void;

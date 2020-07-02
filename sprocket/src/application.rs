@@ -19,6 +19,7 @@ impl Application {
     pub fn new(name: &str) -> Application {
         let (event_sender, event_receiver) = mpsc::channel::<Event>();
 
+        Window::init_glfw();
         Application {
             name: String::from(name),
             windows: Vec::new(),
@@ -28,9 +29,8 @@ impl Application {
         }
     }
 
-    pub fn init(&mut self) {
-        Window::init_glfw();
-        self.graphics_context = match graphics::init(graphics::Api::Vulkan) {
+    pub fn init_graphics(&mut self) {
+        self.graphics_context = match graphics::init(graphics::Api::Vulkan, &self.windows[0]) {
             Ok(context) => Some(context),
             Err(msg) => {
                 error!("Failed to initialize graphics {}", msg);

@@ -1,17 +1,19 @@
+#![allow(dead_code)]
 use crate::graphics::glfw;
 use crate::*;
 use std::ffi::{c_void, CStr, CString};
+use std::ptr;
 
-pub use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
-use ash::{vk, Device, Entry, Instance};
-
+use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
+use ash::{vk, vk::Handle, Device, Entry, Instance};
 pub struct VulkanContext {
     entry: ash::Entry,
     instance: ash::Instance,
     debug_messenger: vk::DebugUtilsMessengerEXT,
+    surface: vk::SurfaceKHR,
 }
 
-pub fn init() -> Result<VulkanContext, String> {
+pub fn init(window: &Window) -> Result<VulkanContext, String> {
     unsafe {
         let entry = match Entry::new() {
             Ok(entry) => entry,
@@ -25,14 +27,20 @@ pub fn init() -> Result<VulkanContext, String> {
         let instance = create_instance(&entry, &validation_layers)?;
 
         let debug_messenger = create_debug_messenger(&entry, &instance)?;
-        let pdevices = instance
-            .enumerate_physical_devices()
-            .expect("Physical device error");
+        let surface = create_surface(&entry, &instance, &window)?;
+        // Choose physical devices
+        let physical_devices = match instance.enumerate_physical_devices() {
+            Ok(devices) => devices,
+            Err(e) => return errfmt!("Failed to enumerate physical devices {}", e),
+        };
+
+        // Create surface
 
         Ok(VulkanContext {
             entry,
             instance,
             debug_messenger,
+            surface,
         })
     }
 
@@ -49,11 +57,6 @@ unsafe fn create_instance(entry: &ash::Entry, layers: &[&str]) -> Result<ash::In
         .engine_name(&app_name)
         .engine_version(0)
         .api_version(vk::make_version(1, 0, 0));
-
-    let appinfo = vk::ApplicationInfo {
-        api_version: vk::make_version(1, 0, 0),
-        ..Default::default()
-    };
 
     // Extension support
     let mut glfw_extension_count = 0;
@@ -77,7 +80,7 @@ unsafe fn create_instance(entry: &ash::Entry, layers: &[&str]) -> Result<ash::In
     let layers: Vec<*const i8> = layers.iter().map(|layer| layer.as_ptr()).collect();
 
     let create_info = vk::InstanceCreateInfo::builder()
-        .application_info(&appinfo)
+        .application_info(&app_info)
         .enabled_layer_names(&layers)
         .enabled_extension_names(&extensions);
     match entry.create_instance(&create_info, None) {
@@ -126,8 +129,8 @@ fn create_debug_messenger(
             | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION
             | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE,
         pfn_user_callback: Some(debug_callback),
-        p_user_data: std::ptr::null_mut(),
-        p_next: std::ptr::null(),
+        p_user_data: ptr::null_mut(),
+        p_next: ptr::null(),
         flags: vk::DebugUtilsMessengerCreateFlagsEXT::default(),
     };
 
@@ -138,6 +141,27 @@ fn create_debug_messenger(
             Err(e) => errfmt!("Failed to create debug utils messenger {}", e),
         }
     }
+}
+
+unsafe fn create_surface(
+    entry: &ash::Entry,
+    instance: &ash::Instance,
+    window: &Window,
+) -> Result<vk::SurfaceKHR, String> {
+    let raw_window = window.get_raw();
+    let mut surface_handle = 0;
+    let instance = instance.handle();
+
+    match glfw::glfwCreateWindowSurface(
+        instance.as_raw(),
+        raw_window,
+        ptr::null(),
+        &mut surface_handle,
+    ) {
+        vk::Result::SUCCESS => {}
+        _ => return errfmt!("Failed to create window surface"),
+    }
+    Ok(vk::SurfaceKHR::from_raw(surface_handle))
 }
 
 impl Drop for VulkanContext {

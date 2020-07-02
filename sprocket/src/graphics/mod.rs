@@ -2,6 +2,7 @@ mod glfw;
 pub use log::{debug, error, info, trace, warn};
 pub mod vulkan;
 pub mod window;
+use window::Window;
 
 pub enum GraphicsContext {
     Vulkan(vulkan::VulkanContext),
@@ -14,9 +15,9 @@ pub enum Api {
 }
 
 /// Initializes the graphics api and returns a context
-pub fn init(api: Api) -> Result<GraphicsContext, String> {
+pub fn init(api: Api, window: &Window) -> Result<GraphicsContext, String> {
     match api {
-        Api::Vulkan => match vulkan::init() {
+        Api::Vulkan => match vulkan::init(window) {
             Ok(context) => Ok(GraphicsContext::Vulkan(context)),
             Err(msg) => Err(msg),
         },
