@@ -5,6 +5,7 @@ pub mod event;
 pub mod graphics;
 pub mod logger;
 pub mod math;
+pub mod utils;
 pub use application::Application;
 pub use graphics::window::{Window, WindowMode};
 /// Exports logging macros
