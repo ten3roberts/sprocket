@@ -5,7 +5,6 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::ffi::{c_void, CStr, CString};
 use std::ptr;
-use utils;
 
 use ash::extensions::khr::Surface;
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
@@ -283,14 +282,14 @@ unsafe fn rate_device(
             return 0;
         }
     }
-    if let None = queue_families.graphics {
+    if queue_families.graphics.is_none() {
         return 0;
     }
-    if let None = queue_families.present {
+    if queue_families.present.is_none() {
         return 0;
     }
 
-    if queue_families.present_support == false {
+    if !queue_families.present_support {
         return 0;
     }
 
@@ -332,7 +331,7 @@ unsafe fn find_physical_device(
     surface: &vk::SurfaceKHR,
     device_extensions: &[&str],
 ) -> Result<(vk::PhysicalDevice, QueueFamilies), Cow<'static, str>> {
-    let devices = instance.enumerate_physical_devices().unwrap_or(Vec::new());
+    let devices = instance.enumerate_physical_devices().unwrap_or_default();
 
     let best_device = match devices
         .iter()

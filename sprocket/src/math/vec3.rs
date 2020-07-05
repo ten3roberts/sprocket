@@ -164,7 +164,7 @@ impl Vec3 {
             return self.y;
         }
         // All are equal
-        return self.x;
+        self.x
     }
 
     /// Returns the largest component
@@ -186,7 +186,7 @@ impl Vec3 {
             return self.y;
         }
         // All are equal
-        return self.x;
+        self.x
     }
 
     pub fn xy(&self) -> Vec2 {

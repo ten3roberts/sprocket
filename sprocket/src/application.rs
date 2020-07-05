@@ -45,7 +45,7 @@ impl Application {
     }
 
     pub fn run(&mut self) {
-        while self.windows.len() > 0 {
+        while !self.windows.is_empty() {
             // Process each window for events
             self.windows
                 .iter()

@@ -93,7 +93,7 @@ impl Window {
             data: Box::into_raw(Box::new(WindowData {
                 width,
                 height,
-                sender: sender,
+                sender,
                 in_focus: false,
             })),
         };
@@ -137,6 +137,10 @@ impl Window {
     pub fn height(&self) -> i32 {
         unsafe { (*self.data).height }
     }
+
+    /// # Safety
+    /// Returns the underlying GLFW window
+    /// Will fail if glfw_terminate is called with alive windows
     pub unsafe fn get_raw(&self) -> *const GLFWwindow {
         self.raw_window
     }
@@ -146,7 +150,7 @@ impl Window {
 unsafe fn get_data(window: *mut GLFWwindow) -> Option<*mut WindowData> {
     let data = glfwGetWindowUserPointer(window) as *mut WindowData;
 
-    if data == ptr::null_mut() {
+    if data.is_null() {
         error!("Invalid window event sender");
         return None;
     }
@@ -164,6 +168,7 @@ extern "C" fn close_callback(window: *mut GLFWwindow) {
         };
     }
 }
+
 #[no_mangle]
 extern "C" fn key_callback(
     window: *mut GLFWwindow,

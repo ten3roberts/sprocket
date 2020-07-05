@@ -103,7 +103,7 @@ impl Swapchain {
             }
         }
         info!("Choosing FIFO present mode");
-        return vk::PresentModeKHR::FIFO;
+        vk::PresentModeKHR::FIFO
     }
 
     fn pick_extent(
@@ -112,7 +112,7 @@ impl Swapchain {
         height: i32,
     ) -> vk::Extent2D {
         if capabilities.current_extent.width != std::u32::MAX {
-            return capabilities.current_extent;
+            capabilities.current_extent
         } else {
             vk::Extent2D {
                 width: max(

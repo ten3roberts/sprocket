@@ -26,7 +26,7 @@ pub fn init(api: Api, window: &Window) -> Result<GraphicsContext, Cow<'static, s
         },
         Api::OpenGL => {
             error!("OpenGL graphics is not implemented yet");
-            return Err("Invalid Graphics API".into());
+            Err("Invalid Graphics API".into())
         }
     }
 }
