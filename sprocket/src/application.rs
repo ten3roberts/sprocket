@@ -1,7 +1,7 @@
 use crate::event::Event;
 use crate::graphics;
 use crate::graphics::window::{Window, WindowMode};
-use log::{debug, error, info, trace, warn};
+use log::{error, info};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;

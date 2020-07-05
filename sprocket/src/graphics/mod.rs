@@ -5,6 +5,8 @@ pub mod window;
 use std::borrow::Cow;
 use window::Window;
 
+const SWAPCHAIN_IMAGE_COUNT: u32 = 3;
+
 pub enum GraphicsContext {
     Vulkan(vulkan::VulkanContext),
 }

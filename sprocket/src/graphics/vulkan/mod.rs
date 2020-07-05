@@ -5,10 +5,15 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::ffi::{c_void, CStr, CString};
 use std::ptr;
+use utils;
 
 use ash::extensions::khr::Surface;
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
-use ash::{vk, vk::Handle, Device, Entry, Instance};
+use ash::{vk, vk::Handle, Entry};
+
+mod swapchain;
+use swapchain::Swapchain;
+
 pub struct VulkanContext {
     entry: ash::Entry,
     instance: ash::Instance,
@@ -17,23 +22,24 @@ pub struct VulkanContext {
     device: ash::Device,
     graphics_queue: vk::Queue,
     present_queue: vk::Queue,
+    swapchain: Swapchain,
 }
 
-struct QueueFamilies {
-    graphics: Option<u32>,
-    present: Option<u32>,
-    compute: Option<u32>,
-    present_support: bool,
+pub struct QueueFamilies {
+    pub graphics: Option<u32>,
+    pub present: Option<u32>,
+    pub compute: Option<u32>,
+    pub present_support: bool,
 }
 
 impl QueueFamilies {
     unsafe fn find(
         instance: &ash::Instance,
-        physical_device: vk::PhysicalDevice,
+        physical_device: &vk::PhysicalDevice,
         surface_loader: &Surface,
-        surface: vk::SurfaceKHR,
+        surface: &vk::SurfaceKHR,
     ) -> QueueFamilies {
-        let families = instance.get_physical_device_queue_family_properties(physical_device);
+        let families = instance.get_physical_device_queue_family_properties(*physical_device);
         let mut graphics_family = None;
         let mut presentation_family = None;
         let mut compute_family = None;
@@ -43,12 +49,12 @@ impl QueueFamilies {
                 graphics_family = Some(i as u32);
             }
             if surface_loader
-                .get_physical_device_surface_support(physical_device, i as u32, surface)
+                .get_physical_device_surface_support(*physical_device, i as u32, *surface)
                 .unwrap_or(false)
             {
                 presentation_family = Some(i as u32);
                 present_support = surface_loader
-                    .get_physical_device_surface_support(physical_device, i as u32, surface)
+                    .get_physical_device_surface_support(*physical_device, i as u32, *surface)
                     .unwrap_or(false);
             }
             if family.queue_flags.contains(vk::QueueFlags::COMPUTE) {
@@ -70,6 +76,7 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
         let entry = unwrap_or_return!("Failed to create vulkan entry", Entry::new());
 
         let validation_layers = ["VK_LAYER_KHRONOS_validation"];
+        let device_extensions = ["VK_KHR_swapchain"];
 
         // Ensure all requested layers exist
         check_validation_layer_support(&entry, &validation_layers)?;
@@ -81,11 +88,29 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
 
         let surface_loader = Surface::new(&entry, &instance);
         let (physical_device, queue_families) =
-            find_physical_device(&instance, &surface_loader, surface)?;
+            find_physical_device(&instance, &surface_loader, &surface, &device_extensions)?;
 
-        let device = create_device(&instance, physical_device, &queue_families)?;
+        let device = create_device(
+            &instance,
+            physical_device,
+            &queue_families,
+            &device_extensions,
+        )?;
         let graphics_queue = device.get_device_queue(queue_families.graphics.unwrap(), 0);
         let present_queue = device.get_device_queue(queue_families.present.unwrap(), 0);
+        let swapchain = unwrap_or_return!(
+            "Failed to create swapchain",
+            Swapchain::new(
+                &instance,
+                &physical_device,
+                &device,
+                &surface_loader,
+                &surface,
+                &queue_families,
+                window.width(),
+                window.height(),
+            )
+        );
         Ok(VulkanContext {
             entry,
             instance,
@@ -94,6 +119,7 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
             device,
             graphics_queue,
             present_queue,
+            swapchain,
         })
     }
 
@@ -128,12 +154,8 @@ unsafe fn create_instance(
     info!("Extensions: {:?}", extensions);
 
     // Convert the slice to *const *const null terminated
-    let layers: Vec<CString> = layers
-        .iter()
-        .map(|layer| CString::new(*layer).expect("Failed to convert layer to c_str"))
-        .collect();
-
-    let layers: Vec<*const i8> = layers.iter().map(|layer| layer.as_ptr()).collect();
+    let layers = utils::vec_to_null_terminated(layers);
+    let layers = utils::vec_to_carray(&layers);
 
     let create_info = vk::InstanceCreateInfo::builder()
         .application_info(&app_info)
@@ -227,14 +249,40 @@ unsafe fn rate_device(
     instance: &ash::Instance,
     device: &vk::PhysicalDevice,
     surface_loader: &Surface,
-    surface: vk::SurfaceKHR,
+    surface: &vk::SurfaceKHR,
+    extensions: &[&str],
 ) -> u32 {
     let mut score = 1;
     let properties = instance.get_physical_device_properties(*device);
     // let features = instance.get_physical_device_features(*device);
 
-    let queue_families = QueueFamilies::find(instance, *device, surface_loader, surface);
+    let queue_families = QueueFamilies::find(instance, device, surface_loader, surface);
 
+    let available_extensions: Vec<&CStr> =
+        match instance.enumerate_device_extension_properties(*device) {
+            Ok(extensions) => extensions
+                .iter()
+                .map(|extension| CStr::from_ptr(extension.extension_name.as_ptr()))
+                .collect(),
+            Err(e) => {
+                error!("Failed to get supported device extensions '{}'", e);
+                return 0;
+            }
+        };
+
+    // Check if all layers exist
+    for extension in extensions {
+        let mut found = false;
+        for available in &available_extensions {
+            if available.to_string_lossy() == *extension {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            return 0;
+        }
+    }
     if let None = queue_families.graphics {
         return 0;
     }
@@ -243,6 +291,27 @@ unsafe fn rate_device(
     }
 
     if queue_families.present_support == false {
+        return 0;
+    }
+
+    // Check adequate swapchain support
+    let (capabilities, formats, present_modes) =
+        match Swapchain::query_support(device, surface_loader, surface) {
+            Ok(v) => v,
+            Err(_) => return 0,
+        };
+
+    if capabilities.min_image_count > graphics::SWAPCHAIN_IMAGE_COUNT
+        || (capabilities.max_image_count != 0
+            && capabilities.max_image_count < graphics::SWAPCHAIN_IMAGE_COUNT)
+    {
+        return 0;
+    }
+
+    if formats.is_empty() {
+        return 0;
+    }
+    if present_modes.is_empty() {
         return 0;
     }
 
@@ -260,17 +329,16 @@ unsafe fn rate_device(
 unsafe fn find_physical_device(
     instance: &ash::Instance,
     surface_loader: &Surface,
-    surface: vk::SurfaceKHR,
+    surface: &vk::SurfaceKHR,
+    device_extensions: &[&str],
 ) -> Result<(vk::PhysicalDevice, QueueFamilies), Cow<'static, str>> {
     let devices = instance.enumerate_physical_devices().unwrap_or(Vec::new());
 
     let best_device = match devices
         .iter()
-        .zip(
-            devices
-                .iter()
-                .map(|device| rate_device(instance, device, surface_loader, surface)),
-        )
+        .zip(devices.iter().map(|device| {
+            rate_device(instance, device, surface_loader, surface, device_extensions)
+        }))
         .filter(|(_, score)| *score > 0)
         .max_by(|(_, prev_score), (_, score)| score.cmp(prev_score))
     {
@@ -286,7 +354,7 @@ unsafe fn find_physical_device(
 
     Ok((
         *best_device.0,
-        QueueFamilies::find(instance, *best_device.0, surface_loader, surface),
+        QueueFamilies::find(instance, best_device.0, surface_loader, surface),
     ))
 }
 
@@ -294,6 +362,7 @@ unsafe fn create_device(
     instance: &ash::Instance,
     pdevice: vk::PhysicalDevice,
     queue_families: &QueueFamilies,
+    device_extensions: &[&str],
 ) -> Result<ash::Device, Cow<'static, str>> {
     let priorities = [1.0];
 
@@ -316,9 +385,15 @@ unsafe fn create_device(
         shader_clip_distance: 1,
         ..Default::default()
     };
+
+    // Convert the slice to *const *const null terminated
+    let device_extensions = utils::vec_to_null_terminated(device_extensions);
+    let device_extensions = utils::vec_to_carray(&device_extensions);
+
     let device_create_info = vk::DeviceCreateInfo::builder()
         .queue_create_infos(&queue_infos)
-        .enabled_features(&features);
+        .enabled_features(&features)
+        .enabled_extension_names(&device_extensions);
 
     unwrap_and_return!(
         "Failed to create logical device",
