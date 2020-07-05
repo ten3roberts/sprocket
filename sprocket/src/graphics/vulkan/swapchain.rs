@@ -57,16 +57,13 @@ impl Swapchain {
                 queue_families.present.unwrap(),
             ];
 
-            info!("Queue familes graphics: {:?}", queue_families.graphics);
-            info!("Queue familes present: {:?}", queue_families.present);
-
             if queue_families.graphics == queue_families.present {
-                trace!("Sharing mode concurrent");
+                debug!("Sharing mode concurrent");
                 create_info.image_sharing_mode = vk::SharingMode::CONCURRENT;
                 create_info.queue_family_index_count = 2;
                 create_info = create_info.queue_family_indices(&queue_family_indices);
             } else {
-                trace!("Sharing mode exclusive");
+                debug!("Sharing mode exclusive");
                 create_info.image_sharing_mode = vk::SharingMode::EXCLUSIVE;
                 create_info.queue_family_index_count = 0;
             }
