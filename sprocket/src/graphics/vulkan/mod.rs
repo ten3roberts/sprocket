@@ -11,6 +11,7 @@ use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
 use ash::{vk, vk::Handle, Entry};
 
 mod swapchain;
+mod texture;
 use swapchain::Swapchain;
 
 pub struct VulkanContext {

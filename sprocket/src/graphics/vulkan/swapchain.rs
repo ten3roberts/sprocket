@@ -1,13 +1,13 @@
+use super::texture::Texture;
+use crate::*;
 use ash::vk;
 use std::borrow::Cow;
 use std::cmp::{max, min};
 
-use crate::*;
-
 pub struct Swapchain {
     swapchain: vk::SwapchainKHR,
     swapchain_loader: ash::extensions::khr::Swapchain,
-    images: Vec<vk::Image>,
+    images: Vec<Texture>,
 }
 
 impl Swapchain {
@@ -72,10 +72,26 @@ impl Swapchain {
                 "Failed to create swapchain",
                 swapchain_loader.create_swapchain(&create_info, None)
             );
+
+            // Create textures from the images in swapchain
             let images = unwrap_or_return!(
                 "Failed to get swapchain images",
                 swapchain_loader.get_swapchain_images(swapchain)
             );
+
+            let images = images
+                .into_iter()
+                .map(|image| {
+                    Texture::new_from_image(
+                        device,
+                        width as u32,
+                        height as u32,
+                        image,
+                        format.format,
+                    )
+                })
+                .collect();
+
             Ok(Swapchain {
                 swapchain,
                 swapchain_loader,
