@@ -17,12 +17,14 @@ use swapchain::Swapchain;
 pub struct VulkanContext {
     entry: ash::Entry,
     instance: ash::Instance,
+    debug_utils_loader: ash::extensions::ext::DebugUtils,
     debug_messenger: vk::DebugUtilsMessengerEXT,
+    surface_loader: Surface,
     surface: vk::SurfaceKHR,
-    device: ash::Device,
     graphics_queue: vk::Queue,
     present_queue: vk::Queue,
     swapchain: Swapchain,
+    device: ash::Device,
 }
 
 pub struct QueueFamilies {
@@ -82,7 +84,9 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
         check_validation_layer_support(&entry, &validation_layers)?;
         let instance = create_instance(&entry, &validation_layers)?;
 
-        let debug_messenger = create_debug_messenger(&entry, &instance)?;
+        let debug_utils_loader = ash::extensions::ext::DebugUtils::new(&entry, &instance);
+
+        let debug_messenger = create_debug_messenger(&debug_utils_loader)?;
         let surface = create_surface(&instance, &window)?;
         // Choose physical devices
 
@@ -96,6 +100,7 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
             &queue_families,
             &device_extensions,
         )?;
+
         let graphics_queue = device.get_device_queue(queue_families.graphics.unwrap(), 0);
         let present_queue = device.get_device_queue(queue_families.present.unwrap(), 0);
         let swapchain = unwrap_or_return!(
@@ -114,7 +119,9 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
         Ok(VulkanContext {
             entry,
             instance,
+            debug_utils_loader,
             debug_messenger,
+            surface_loader,
             surface,
             device,
             graphics_queue,
@@ -199,8 +206,7 @@ fn check_validation_layer_support(
 }
 
 fn create_debug_messenger(
-    entry: &ash::Entry,
-    instance: &ash::Instance,
+    debug_utils_loader: &ash::extensions::ext::DebugUtils,
 ) -> Result<vk::DebugUtilsMessengerEXT, Cow<'static, str>> {
     let create_info = vk::DebugUtilsMessengerCreateInfoEXT {
         s_type: vk::StructureType::DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
@@ -217,10 +223,9 @@ fn create_debug_messenger(
     };
 
     unsafe {
-        let debug_utils = ash::extensions::ext::DebugUtils::new(entry, instance);
         unwrap_and_return!(
             "Failed to create debug utils messenger",
-            debug_utils.create_debug_utils_messenger(&create_info, None)
+            debug_utils_loader.create_debug_utils_messenger(&create_info, None)
         )
     }
 }
@@ -403,6 +408,15 @@ unsafe fn create_device(
 impl Drop for VulkanContext {
     fn drop(&mut self) {
         info!("Dropping vulkan context");
+        unsafe {
+            self.swapchain.destroy();
+            self.device.device_wait_idle().unwrap();
+            self.device.destroy_device(None);
+            self.surface_loader.destroy_surface(self.surface, None);
+            self.debug_utils_loader
+                .destroy_debug_utils_messenger(self.debug_messenger, None);
+            self.instance.destroy_instance(None);
+        }
     }
 }
 

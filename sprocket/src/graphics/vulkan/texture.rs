@@ -2,6 +2,7 @@ use ash::version::DeviceV1_0;
 use ash::vk;
 
 pub struct Texture {
+    device: ash::Device,
     image: vk::Image,
     view: vk::ImageView,
     format: vk::Format,
@@ -71,6 +72,7 @@ impl Texture {
         let size = unsafe { device.get_image_memory_requirements(image).size };
 
         Texture {
+            device: device.clone(),
             image,
             view,
             format,
@@ -78,6 +80,17 @@ impl Texture {
             height,
             size,
             owns_image: false,
+        }
+    }
+}
+
+impl Drop for Texture {
+    fn drop(&mut self) {
+        unsafe {
+            if self.owns_image {
+                self.device.destroy_image(self.image, None);
+            }
+            self.device.destroy_image_view(self.view, None);
         }
     }
 }

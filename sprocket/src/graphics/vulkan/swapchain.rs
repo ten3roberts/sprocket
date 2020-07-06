@@ -172,4 +172,19 @@ impl Swapchain {
 
         Ok((capabilities, formats, present_modes))
     }
+
+    // Destroys the swapchain and textures
+    pub unsafe fn destroy(&mut self) {
+        self.images.clear();
+        self.swapchain_loader
+            .destroy_swapchain(self.swapchain, None);
+    }
+}
+
+impl Drop for Swapchain {
+    fn drop(&mut self) {
+        unsafe {
+            self.destroy();
+        };
+    }
 }
