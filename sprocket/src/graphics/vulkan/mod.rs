@@ -14,17 +14,29 @@ mod swapchain;
 mod texture;
 use swapchain::Swapchain;
 
+mod pipeline;
+use pipeline::Pipeline;
+
+mod renderpass;
+use renderpass::RenderPass;
+
 pub struct VulkanContext {
     entry: ash::Entry,
     instance: ash::Instance,
+    device: ash::Device,
     debug_utils_loader: ash::extensions::ext::DebugUtils,
     debug_messenger: vk::DebugUtilsMessengerEXT,
     surface_loader: Surface,
     surface: vk::SurfaceKHR,
     graphics_queue: vk::Queue,
     present_queue: vk::Queue,
+    data: Option<VulkanData>,
+}
+
+struct VulkanData {
     swapchain: Swapchain,
-    device: ash::Device,
+    renderpass: RenderPass,
+    pipeline: Pipeline,
 }
 
 pub struct QueueFamilies {
@@ -112,10 +124,20 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
                 &surface_loader,
                 &surface,
                 &queue_families,
-                window.width(),
-                window.height(),
+                window.extent()
             )
         );
+
+        let pipeline_spec = pipeline::PipelineSpec {
+            vertex_shader: "./data/shaders/default.vert.spv".into(),
+            fragment_shader: "./data/shaders/default.frag.spv".into(),
+            geometry_shader: "".into(),
+        };
+
+        let renderpass = RenderPass::new(&device, swapchain.format())?;
+
+        let pipeline = Pipeline::new(&device, pipeline_spec, window.extent(), &renderpass)?;
+
         Ok(VulkanContext {
             entry,
             instance,
@@ -126,7 +148,11 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
             device,
             graphics_queue,
             present_queue,
-            swapchain,
+            data: Some(VulkanData {
+                swapchain,
+                renderpass,
+                pipeline,
+            }),
         })
     }
 
@@ -405,11 +431,14 @@ unsafe fn create_device(
         instance.create_device(pdevice, &device_create_info, None)
     )
 }
+
 impl Drop for VulkanContext {
     fn drop(&mut self) {
         info!("Dropping vulkan context");
         unsafe {
-            self.swapchain.destroy();
+            // Drop data before device
+            // This will later migrate out to materials and alike
+            self.data = None;
             self.device.device_wait_idle().unwrap();
             self.device.destroy_device(None);
             self.surface_loader.destroy_surface(self.surface, None);

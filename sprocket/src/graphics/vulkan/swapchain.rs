@@ -8,6 +8,7 @@ pub struct Swapchain {
     swapchain: vk::SwapchainKHR,
     swapchain_loader: ash::extensions::khr::Swapchain,
     images: Vec<Texture>,
+    format: vk::Format,
 }
 
 impl Swapchain {
@@ -86,8 +87,13 @@ impl Swapchain {
                 swapchain,
                 swapchain_loader,
                 images,
+                format: format.format,
             })
         }
+    }
+
+    pub fn format(&self) -> vk::Format {
+        self.format
     }
 
     fn pick_format(formats: Vec<vk::SurfaceFormatKHR>) -> vk::SurfaceFormatKHR {
@@ -158,19 +164,14 @@ impl Swapchain {
 
         Ok((capabilities, formats, present_modes))
     }
-
-    // Destroys the swapchain and textures
-    pub unsafe fn destroy(&mut self) {
-        self.images.clear();
-        self.swapchain_loader
-            .destroy_swapchain(self.swapchain, None);
-    }
 }
 
 impl Drop for Swapchain {
     fn drop(&mut self) {
         unsafe {
-            self.destroy();
+            self.images.clear();
+            self.swapchain_loader
+                .destroy_swapchain(self.swapchain, None);
         };
     }
 }
