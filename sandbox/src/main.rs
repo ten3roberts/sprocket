@@ -1,5 +1,12 @@
 use sprocket::*;
+use std::env;
 fn main() {
+    let path = env::current_exe().unwrap();
+    println!("Path: {:?}", path);
+
+    utils::normalize_working_dir();
+    env::set_current_dir("../../sandbox").expect("Failed to set working directory");
+
     let mut application = Application::new("Sandbox");
     info!("Created application {}", application.name());
 
