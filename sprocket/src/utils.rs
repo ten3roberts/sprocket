@@ -28,8 +28,8 @@ pub fn normalize_working_dir() {
         .to_owned();
 
     let last_delimiter = path
-        .rfind("/")
-        .unwrap_or(path.rfind("\\").unwrap_or(path.len() - 1));
+        .rfind('/')
+        .unwrap_or_else(|| path.rfind('\\').unwrap_or_else(|| path.len() - 1));
     let path = &path[0..last_delimiter];
     env::set_current_dir(&path).expect("Failed to set working directory");
 }

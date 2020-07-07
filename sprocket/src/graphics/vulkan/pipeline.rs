@@ -200,7 +200,7 @@ fn create_shader_module(
     };
     let create_info = vk::ShaderModuleCreateInfo {
         code_size: code.len(),
-        p_code: code.as_ptr() as *const u32,
+        p_code: unsafe { std::mem::transmute(code.as_ptr()) },
         ..Default::default()
     };
 
