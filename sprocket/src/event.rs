@@ -151,4 +151,6 @@ pub enum KeyCode {
     Mouse2 = 351,
     Mouse3 = 352,
     Mouse4 = 353,
+    Mouse5 = 354,
+    Mouse6 = 355,
 }
