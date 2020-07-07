@@ -44,7 +44,7 @@ impl Pipeline {
             .module(fragment_shader_module)
             .build();
 
-        let shader_stages = vec![vertex_shader_info, fragment_shader_info];
+        let shader_stages = [vertex_shader_info, fragment_shader_info];
 
         // Vertex input
         let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::builder()
