@@ -1,3 +1,4 @@
+use crate::graphics::Extent2D;
 use ash::version::DeviceV1_0;
 use ash::vk;
 
@@ -7,19 +8,18 @@ pub struct Texture {
     view: vk::ImageView,
     format: vk::Format,
     size: vk::DeviceSize,
-    width: u32,
-    height: u32,
+    extent: Extent2D,
     owns_image: bool,
 }
 
 impl Texture {
-    pub fn new(device: &ash::Device, width: u32, height: u32) -> Texture {
+    pub fn new(device: &ash::Device, extent: Extent2D) -> Texture {
         let format = vk::Format::R8G8B8_SRGB;
         let image_create_info = vk::ImageCreateInfo::builder()
             .image_type(vk::ImageType::TYPE_2D)
             .extent(vk::Extent3D {
-                width,
-                height,
+                width: extent.width,
+                height: extent.height,
                 depth: 1,
             })
             .mip_levels(1)
@@ -35,14 +35,13 @@ impl Texture {
                 .create_image(&image_create_info, None)
                 .expect("Failed to create image")
         };
-        Texture::new_from_image(device, width, height, image, format)
+        Texture::new_from_image(device, extent, image, format)
     }
 
     /// Creates a texture with an already existing image view
     pub fn new_from_image(
         device: &ash::Device,
-        width: u32,
-        height: u32,
+        extent: Extent2D,
         image: vk::Image,
         format: vk::Format,
     ) -> Texture {
@@ -76,8 +75,7 @@ impl Texture {
             image,
             view,
             format,
-            width,
-            height,
+            extent,
             size,
             owns_image: false,
         }

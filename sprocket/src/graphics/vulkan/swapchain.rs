@@ -1,9 +1,9 @@
 use super::texture::Texture;
+use crate::graphics::Extent2D;
 use crate::*;
 use ash::vk;
 use std::borrow::Cow;
 use std::cmp::{max, min};
-
 pub struct Swapchain {
     swapchain: vk::SwapchainKHR,
     swapchain_loader: ash::extensions::khr::Swapchain,
@@ -18,8 +18,7 @@ impl Swapchain {
         surface_loader: &ash::extensions::khr::Surface,
         surface: &vk::SurfaceKHR,
         queue_families: &graphics::vulkan::QueueFamilies,
-        width: i32,
-        height: i32,
+        extent: Extent2D,
     ) -> Result<Swapchain, Cow<'static, str>> {
         unsafe {
             let (capabilities, formats, present_modes) = unwrap_or_return!(
@@ -29,7 +28,7 @@ impl Swapchain {
 
             let format = Self::pick_format(formats);
             let present_mode = Self::pick_present_mode(present_modes);
-            let extent = Self::pick_extent(&capabilities, width, height);
+            let extent = Self::pick_extent(&capabilities, extent);
             info!(
                 "Swapchain minimum image count: {}",
                 capabilities.min_image_count
@@ -78,18 +77,9 @@ impl Swapchain {
                 "Failed to get swapchain images",
                 swapchain_loader.get_swapchain_images(swapchain)
             );
-
             let images = images
                 .into_iter()
-                .map(|image| {
-                    Texture::new_from_image(
-                        device,
-                        width as u32,
-                        height as u32,
-                        image,
-                        format.format,
-                    )
-                })
+                .map(|image| Texture::new_from_image(device, extent.into(), image, format.format))
                 .collect();
 
             Ok(Swapchain {
@@ -122,22 +112,18 @@ impl Swapchain {
         vk::PresentModeKHR::FIFO
     }
 
-    fn pick_extent(
-        capabilities: &vk::SurfaceCapabilitiesKHR,
-        width: i32,
-        height: i32,
-    ) -> vk::Extent2D {
+    fn pick_extent(capabilities: &vk::SurfaceCapabilitiesKHR, extent: Extent2D) -> vk::Extent2D {
         if capabilities.current_extent.width != std::u32::MAX {
             capabilities.current_extent
         } else {
             vk::Extent2D {
                 width: max(
                     capabilities.min_image_extent.width,
-                    min(capabilities.max_image_extent.width, width as u32),
+                    min(capabilities.max_image_extent.width, extent.width),
                 ),
                 height: max(
                     capabilities.min_image_extent.height,
-                    min(capabilities.max_image_extent.height, height as u32),
+                    min(capabilities.max_image_extent.height, extent.height),
                 ),
             }
         }

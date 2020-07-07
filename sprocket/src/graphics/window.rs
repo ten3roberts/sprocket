@@ -1,4 +1,5 @@
 use super::glfw::*;
+use super::Extent2D;
 use crate::event::Event;
 use crate::event::KeyCode;
 use log::{debug, error, info, warn};
@@ -130,12 +131,21 @@ impl Window {
         &self.title
     }
 
-    pub fn width(&self) -> i32 {
-        unsafe { (*self.data).width }
+    pub fn width(&self) -> u32 {
+        unsafe { (*self.data).width as u32 }
     }
 
-    pub fn height(&self) -> i32 {
-        unsafe { (*self.data).height }
+    pub fn height(&self) -> u32 {
+        unsafe { (*self.data).height as u32 }
+    }
+
+    pub fn extent(&self) -> Extent2D {
+        unsafe {
+            Extent2D {
+                width: (*self.data).width as u32,
+                height: (*self.data).height as u32,
+            }
+        }
     }
 
     /// # Safety

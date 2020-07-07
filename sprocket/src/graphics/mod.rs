@@ -30,3 +30,30 @@ pub fn init(api: Api, window: &Window) -> Result<GraphicsContext, Cow<'static, s
         }
     }
 }
+
+pub struct Extent2D {
+    width: u32,
+    height: u32,
+}
+
+impl Extent2D {
+    pub fn new(width: u32, height: u32) -> Extent2D {
+        Extent2D { width, height }
+    }
+}
+impl Clone for Extent2D {
+    fn clone(&self) -> Self {
+        Extent2D { ..*self }
+    }
+}
+
+impl std::convert::From<ash::vk::Extent2D> for Extent2D {
+    fn from(vkextent: ash::vk::Extent2D) -> Self {
+        Extent2D {
+            width: vkextent.width,
+            height: vkextent.height,
+        }
+    }
+}
+
+impl Copy for Extent2D {}
