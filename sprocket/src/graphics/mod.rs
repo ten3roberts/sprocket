@@ -56,4 +56,13 @@ impl std::convert::From<ash::vk::Extent2D> for Extent2D {
     }
 }
 
+impl std::convert::From<Extent2D> for ash::vk::Extent2D {
+    fn from(extent: Extent2D) -> Self {
+        ash::vk::Extent2D {
+            width: extent.width,
+            height: extent.height,
+        }
+    }
+}
+
 impl Copy for Extent2D {}

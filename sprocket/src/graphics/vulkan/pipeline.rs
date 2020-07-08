@@ -179,6 +179,10 @@ impl Pipeline {
             pipeline,
         })
     }
+
+    pub fn vk(&self) -> vk::Pipeline {
+        self.pipeline
+    }
 }
 
 impl Drop for Pipeline {

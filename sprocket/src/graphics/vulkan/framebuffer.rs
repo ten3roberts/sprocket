@@ -8,6 +8,7 @@ use std::borrow::Cow;
 pub struct Framebuffer {
     device: ash::Device,
     framebuffer: vk::Framebuffer,
+    extent: Extent2D,
 }
 
 impl Framebuffer {
@@ -43,11 +44,16 @@ impl Framebuffer {
         Ok(Framebuffer {
             device: device.clone(),
             framebuffer,
+            extent,
         })
     }
 
     pub fn vk(&self) -> vk::Framebuffer {
         self.framebuffer
+    }
+
+    pub fn extent(&self) -> Extent2D {
+        self.extent
     }
 }
 

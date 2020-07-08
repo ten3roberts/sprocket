@@ -23,6 +23,10 @@ use renderpass::RenderPass;
 mod framebuffer;
 use framebuffer::Framebuffer;
 
+mod commandbuffer;
+use commandbuffer::CommandBuffer;
+use commandbuffer::CommandPool;
+
 pub struct VulkanContext {
     entry: ash::Entry,
     instance: ash::Instance,
@@ -41,6 +45,8 @@ struct VulkanData {
     renderpass: RenderPass,
     pipeline: Pipeline,
     framebuffers: Vec<Framebuffer>,
+    commandpool: CommandPool,
+    commandbuffers: Vec<CommandBuffer>,
 }
 
 pub struct QueueFamilies {
@@ -152,6 +158,22 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
             )?)
         }
 
+        let commandpool =
+            CommandPool::new(&device, queue_families.graphics.unwrap(), false, false)?;
+
+        let mut commandbuffers =
+            CommandBuffer::new_primary(&device, &commandpool, swapchain.image_count())?;
+
+        // Prerecord commandbuffers
+        for (i, commandbuffer) in commandbuffers.iter_mut().enumerate() {
+            commandbuffer.begin()?;
+            commandbuffer.begin_renderpass(&renderpass, &framebuffers[i]);
+            commandbuffer.bind_pipeline(&pipeline);
+            commandbuffer.draw();
+            commandbuffer.end_renderpass();
+            commandbuffer.end()?;
+        }
+
         Ok(VulkanContext {
             entry,
             instance,
@@ -167,6 +189,8 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
                 renderpass,
                 pipeline,
                 framebuffers,
+                commandpool,
+                commandbuffers,
             }),
         })
     }
