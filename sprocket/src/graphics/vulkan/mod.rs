@@ -20,6 +20,9 @@ use pipeline::Pipeline;
 mod renderpass;
 use renderpass::RenderPass;
 
+mod framebuffer;
+use framebuffer::Framebuffer;
+
 pub struct VulkanContext {
     entry: ash::Entry,
     instance: ash::Instance,
@@ -37,6 +40,7 @@ struct VulkanData {
     swapchain: Swapchain,
     renderpass: RenderPass,
     pipeline: Pipeline,
+    framebuffers: Vec<Framebuffer>,
 }
 
 pub struct QueueFamilies {
@@ -138,6 +142,16 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
 
         let pipeline = Pipeline::new(&device, pipeline_spec, window.extent(), &renderpass)?;
 
+        let mut framebuffers = Vec::with_capacity(swapchain.image_count());
+        for i in 0..swapchain.image_count() {
+            framebuffers.push(Framebuffer::new(
+                &device,
+                &[swapchain.image(i)],
+                &renderpass,
+                swapchain.extent(),
+            )?)
+        }
+
         Ok(VulkanContext {
             entry,
             instance,
@@ -152,6 +166,7 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
                 swapchain,
                 renderpass,
                 pipeline,
+                framebuffers,
             }),
         })
     }
