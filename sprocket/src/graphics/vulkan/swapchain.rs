@@ -9,6 +9,7 @@ pub struct Swapchain {
     swapchain_loader: ash::extensions::khr::Swapchain,
     images: Vec<Texture>,
     format: vk::Format,
+    extent: Extent2D,
 }
 
 impl Swapchain {
@@ -88,6 +89,7 @@ impl Swapchain {
                 swapchain_loader,
                 images,
                 format: format.format,
+                extent: extent.into(),
             })
         }
     }
@@ -133,6 +135,18 @@ impl Swapchain {
                 ),
             }
         }
+    }
+
+    pub fn image_count(&self) -> usize {
+        self.images.len()
+    }
+
+    pub fn image(&self, index: usize) -> &Texture {
+        &self.images[index]
+    }
+
+    pub fn extent(&self) -> Extent2D {
+        self.extent
     }
 
     pub unsafe fn query_support(

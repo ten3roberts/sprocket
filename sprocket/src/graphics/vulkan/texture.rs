@@ -80,6 +80,14 @@ impl Texture {
             owns_image: false,
         }
     }
+
+    pub fn image_view(&self) -> vk::ImageView {
+        self.view
+    }
+
+    pub fn image(&self) -> vk::Image {
+        self.image
+    }
 }
 
 impl Drop for Texture {
