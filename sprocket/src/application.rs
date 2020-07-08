@@ -1,6 +1,7 @@
 use crate::event::Event;
 use crate::graphics;
 use crate::graphics::window::{Window, WindowMode};
+use graphics::vulkan::renderer::Renderer;
 use log::{error, info};
 use std::sync::mpsc;
 use std::thread;
@@ -12,6 +13,7 @@ pub struct Application {
     event_receiver: mpsc::Receiver<Event>,
     event_sender: mpsc::Sender<Event>,
     graphics_context: Option<graphics::GraphicsContext>,
+    renderer: Option<Renderer>,
 }
 
 impl Application {
@@ -26,6 +28,7 @@ impl Application {
             event_receiver,
             event_sender,
             graphics_context: None,
+            renderer: None,
         }
     }
 
@@ -37,6 +40,19 @@ impl Application {
                 None
             }
         };
+
+        // Create vulkan renderer if vulkan
+        if let graphics::GraphicsContext::Vulkan(context) = self.graphics_context.as_ref().unwrap()
+        {
+            self.renderer = match Renderer::new(context.clone()) {
+                Ok(renderer) => Some(renderer),
+                Err(e) => {
+                    error!("Failed to create renderer '{}'", e);
+                    None
+                }
+            };
+        } else {
+        }
     }
 
     pub fn add_window(&mut self, title: &str, width: i32, height: i32, mode: WindowMode) {
@@ -52,6 +68,11 @@ impl Application {
                 .for_each(|window| window.process_events());
 
             self.windows.retain(|window| !window.should_close());
+
+            if let Some(renderer) = &mut self.renderer {
+                info!("Rendering");
+                renderer.draw_frame();
+            }
 
             // Receive and handle events
             while let Ok(event) = self.event_receiver.try_recv() {

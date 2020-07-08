@@ -3,12 +3,14 @@ pub use log::{debug, error, info, trace, warn};
 pub mod vulkan;
 pub mod window;
 use std::borrow::Cow;
+use std::sync::Arc;
 use window::Window;
 
 const SWAPCHAIN_IMAGE_COUNT: u32 = 3;
 
 pub enum GraphicsContext {
-    Vulkan(vulkan::VulkanContext),
+    Vulkan(Arc<vulkan::VulkanContext>),
+    OpenGL,
 }
 
 pub enum Api {
@@ -21,7 +23,7 @@ pub enum Api {
 pub fn init(api: Api, window: &Window) -> Result<GraphicsContext, Cow<'static, str>> {
     match api {
         Api::Vulkan => match vulkan::init(window) {
-            Ok(context) => Ok(GraphicsContext::Vulkan(context)),
+            Ok(context) => Ok(GraphicsContext::Vulkan(Arc::new(context))),
             Err(msg) => Err(msg),
         },
         Api::OpenGL => {

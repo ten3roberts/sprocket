@@ -118,9 +118,35 @@ impl CommandBuffer {
         Ok(())
     }
 
+    pub fn submit(
+        device: &ash::Device,
+        commandbuffers: &[&CommandBuffer],
+        queue: &vk::Queue,
+        wait_semaphores: &[vk::Semaphore],
+        wait_stages: &[vk::PipelineStageFlags],
+        signal_semaphores: &[vk::Semaphore],
+    ) -> Result<(), Cow<'static, str>> {
+        let commandbuffers: Vec<vk::CommandBuffer> = commandbuffers
+            .iter()
+            .map(|commandbuffer| commandbuffer.commandbuffer)
+            .collect();
+        let submit_info = vk::SubmitInfo::builder()
+            .wait_semaphores(wait_semaphores)
+            .wait_dst_stage_mask(wait_stages)
+            .command_buffers(&commandbuffers)
+            .signal_semaphores(signal_semaphores)
+            .build();
+
+        unwrap_and_return!("Failed to submit command buffers", unsafe {
+            device.queue_submit(*queue, &[submit_info], vk::Fence::null())
+        })
+    }
+
     pub fn begin_renderpass(&mut self, renderpass: &RenderPass, framebuffer: &Framebuffer) {
         let clear_values = [vk::ClearValue {
-            color: vk::ClearColorValue { int32: [0; 4] },
+            color: vk::ClearColorValue {
+                float32: [0.5, 0.5, 0.5, 1.0],
+            },
         }];
 
         let renderpass_info = vk::RenderPassBeginInfo::builder()

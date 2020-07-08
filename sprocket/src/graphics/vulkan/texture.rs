@@ -49,10 +49,10 @@ impl Texture {
             .view_type(vk::ImageViewType::TYPE_2D)
             .format(format)
             .components(vk::ComponentMapping {
-                r: vk::ComponentSwizzle::R,
-                g: vk::ComponentSwizzle::G,
-                b: vk::ComponentSwizzle::B,
-                a: vk::ComponentSwizzle::A,
+                r: vk::ComponentSwizzle::IDENTITY,
+                g: vk::ComponentSwizzle::IDENTITY,
+                b: vk::ComponentSwizzle::IDENTITY,
+                a: vk::ComponentSwizzle::IDENTITY,
             })
             .subresource_range(vk::ImageSubresourceRange {
                 aspect_mask: vk::ImageAspectFlags::COLOR,

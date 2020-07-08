@@ -33,12 +33,22 @@ impl RenderPass {
             .color_attachments(&[color_attachment_ref])
             .build();
 
+        let dependencies = [vk::SubpassDependency::builder()
+            .src_subpass(vk::SUBPASS_EXTERNAL)
+            .dst_subpass(0)
+            .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+            .src_access_mask(vk::AccessFlags::default())
+            .dst_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+            .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
+            .build()];
+
         let attachments = &[color_attachment];
         let subpasses = &[subpass];
 
         let renderpass_info = vk::RenderPassCreateInfo::builder()
             .attachments(attachments)
-            .subpasses(subpasses);
+            .subpasses(subpasses)
+            .dependencies(&dependencies);
 
         let renderpass = unwrap_or_return!("Failed to create renderpass", unsafe {
             device.create_render_pass(&renderpass_info, None)

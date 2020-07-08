@@ -40,8 +40,8 @@ impl Pipeline {
 
         let fragment_shader_info = vk::PipelineShaderStageCreateInfo::builder()
             .stage(vk::ShaderStageFlags::FRAGMENT)
-            .name(&shader_entry_point)
             .module(fragment_shader_module)
+            .name(&shader_entry_point)
             .build();
 
         let shader_stages = [vertex_shader_info, fragment_shader_info];

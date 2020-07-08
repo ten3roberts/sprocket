@@ -27,6 +27,8 @@ mod commandbuffer;
 use commandbuffer::CommandBuffer;
 use commandbuffer::CommandPool;
 
+pub mod renderer;
+
 pub struct VulkanContext {
     entry: ash::Entry,
     instance: ash::Instance,
@@ -312,6 +314,7 @@ unsafe fn create_surface(
         vk::Result::SUCCESS => {}
         _ => return errfmt!("Failed to create window surface"),
     }
+
     Ok(vk::SurfaceKHR::from_raw(surface_handle))
 }
 
@@ -469,6 +472,13 @@ unsafe fn create_device(
         "Failed to create logical device",
         instance.create_device(pdevice, &device_create_info, None)
     )
+}
+
+fn create_semaphore(device: &ash::Device) -> Result<vk::Semaphore, Cow<'static, str>> {
+    let semaphore_info = vk::SemaphoreCreateInfo::builder().build();
+    unwrap_and_return!("Failed to create semaphore", unsafe {
+        device.create_semaphore(&semaphore_info, None)
+    })
 }
 
 impl Drop for VulkanContext {

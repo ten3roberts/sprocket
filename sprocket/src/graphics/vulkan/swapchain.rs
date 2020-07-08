@@ -149,6 +149,37 @@ impl Swapchain {
         self.extent
     }
 
+    /// Returns the index to the next available image in the swapchain
+    pub fn acquire_next_image(&self, semaphore: &vk::Semaphore) -> (u32, bool) {
+        unsafe {
+            self.swapchain_loader
+                .acquire_next_image(self.swapchain, std::u64::MAX, *semaphore, vk::Fence::null())
+                .unwrap()
+        }
+    }
+
+    // Presents an image on the swapchain
+    pub fn present(
+        &self,
+        image_index: u32,
+        queue: vk::Queue,
+        wait_semaphore: vk::Semaphore,
+    ) -> Result<bool, Cow<'static, str>> {
+        let present_info = vk::PresentInfoKHR::builder()
+            .wait_semaphores(&[wait_semaphore])
+            .swapchains(&[self.swapchain])
+            .image_indices(&[image_index])
+            .build();
+
+        unwrap_and_return!("Failed to present to swapchain", unsafe {
+            self.swapchain_loader.queue_present(queue, &present_info)
+        })
+    }
+
+    pub fn vk(&self) -> vk::SwapchainKHR {
+        self.swapchain
+    }
+
     pub unsafe fn query_support(
         physical_device: &vk::PhysicalDevice,
         surface_loader: &ash::extensions::khr::Surface,
