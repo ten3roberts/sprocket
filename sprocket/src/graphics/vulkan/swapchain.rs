@@ -31,10 +31,7 @@ impl Swapchain {
             let format = Self::pick_format(formats);
             let present_mode = Self::pick_present_mode(present_modes);
             let extent = Self::pick_extent(&capabilities, extent);
-            info!(
-                "Swapchain minimum image count: {}",
-                capabilities.min_image_count
-            );
+
             let image_count = graphics::SWAPCHAIN_IMAGE_COUNT;
 
             let swapchain_loader = ash::extensions::khr::Swapchain::new(instance, device);
@@ -154,7 +151,7 @@ impl Swapchain {
         unsafe {
             self.swapchain_loader
                 .acquire_next_image(self.swapchain, std::u64::MAX, *semaphore, vk::Fence::null())
-                .unwrap()
+                .expect()
         }
     }
 

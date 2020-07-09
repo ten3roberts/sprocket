@@ -4,8 +4,6 @@ use crate::graphics::window::{Window, WindowMode};
 use graphics::vulkan::renderer::Renderer;
 use log::{error, info};
 use std::sync::mpsc;
-use std::thread;
-use std::time::Duration;
 
 pub struct Application {
     name: String,

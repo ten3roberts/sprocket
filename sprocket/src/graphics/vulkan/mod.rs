@@ -492,6 +492,22 @@ fn create_fence(device: &ash::Device) -> Result<vk::Fence, Cow<'static, str>> {
     })
 }
 
+fn wait_for_fences(device: &ash::Device, fences: &[vk::Fence], wait_all: bool) {
+    unsafe {
+        if let Err(e) = device.wait_for_fences(fences, wait_all, std::u64::MAX) {
+            error!("Failed to wait on fences '{}'", e);
+        }
+    };
+}
+
+fn reset_fences(device: &ash::Device, fences: &[vk::Fence]) {
+    unsafe {
+        if let Err(e) = device.reset_fences(fences) {
+            error!("Failed to wait on fences '{}'", e);
+        }
+    }
+}
+
 impl Drop for VulkanContext {
     fn drop(&mut self) {
         info!("Dropping vulkan context");

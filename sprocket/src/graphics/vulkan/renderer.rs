@@ -45,14 +45,9 @@ impl Renderer {
 
     pub fn draw_frame(&mut self) {
         let data = self.context.data.as_ref().unwrap();
+        let device = &self.context.device;
 
-        unsafe {
-            self.context.device.wait_for_fences(
-                &[self.in_flight_fences[self.current_frame]],
-                true,
-                std::u64::MAX,
-            );
-        };
+        vulkan::wait_for_fences(device, &[self.in_flight_fences[self.current_frame]], true);
 
         let (image_index, _) = data
             .swapchain
@@ -60,30 +55,20 @@ impl Renderer {
 
         // Check if a previous frame is using this image (i.e. there is its fence to wait on)
         if self.images_in_flight[image_index as usize] != vk::Fence::null() {
-            unsafe {
-                self.context.device.wait_for_fences(
-                    &[self.images_in_flight[image_index as usize]],
-                    true,
-                    std::u64::MAX,
-                );
-            }
+            vulkan::wait_for_fences(device, &[self.images_in_flight[image_index as usize]], true)
         }
 
         self.images_in_flight[image_index as usize] = self.in_flight_fences[self.current_frame];
 
+        // Submit the primary command buffer
         let wait_semaphores = [self.image_available_semaphores[self.current_frame]];
         let signal_semaphores = [self.render_finished_semaphores[self.current_frame]];
         let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
-        // Submit the primary command buffer
-        // Submit command buffers
-        if let Err(e) = unsafe {
-            self.context
-                .device
-                .reset_fences(&[self.in_flight_fences[self.current_frame]])
-        } {};
+
+        vulkan::reset_fences(device, &[self.in_flight_fences[self.current_frame]]);
 
         if let Err(e) = commandbuffer::CommandBuffer::submit(
-            &self.context.device,
+            device,
             &[&data.commandbuffers[image_index as usize]],
             &self.context.graphics_queue,
             &wait_semaphores,
@@ -115,7 +100,10 @@ impl Renderer {
 impl Drop for Renderer {
     fn drop(&mut self) {
         unsafe {
-            self.context.device.device_wait_idle();
+            self.context
+                .device
+                .device_wait_idle()
+                .expect("Failed to wait on device");
             for semaphore in &self.image_available_semaphores {
                 self.context.device.destroy_semaphore(*semaphore, None);
             }
