@@ -65,8 +65,6 @@ impl Application {
                 .iter()
                 .for_each(|window| window.process_events());
 
-            self.windows.retain(|window| !window.should_close());
-
             if let Some(renderer) = &mut self.renderer {
                 renderer.draw_frame();
             }
@@ -78,6 +76,7 @@ impl Application {
                     info!("Event: {:?}", event);
                 }
             }
+            self.windows.retain(|window| !window.should_close());
         }
     }
 

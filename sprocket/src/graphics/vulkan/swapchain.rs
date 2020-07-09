@@ -149,9 +149,18 @@ impl Swapchain {
     /// Returns the index to the next available image in the swapchain
     pub fn acquire_next_image(&self, semaphore: &vk::Semaphore) -> (u32, bool) {
         unsafe {
-            self.swapchain_loader
-                .acquire_next_image(self.swapchain, std::u64::MAX, *semaphore, vk::Fence::null())
-                .expect()
+            match self.swapchain_loader.acquire_next_image(
+                self.swapchain,
+                std::u64::MAX,
+                *semaphore,
+                vk::Fence::null(),
+            ) {
+                Ok((image, suboptimal)) => return (image, suboptimal),
+                Err(e) => {
+                    error!("Failed to acquire next image from swapchain '{}'", e);
+                    return (0, false);
+                }
+            }
         }
     }
 

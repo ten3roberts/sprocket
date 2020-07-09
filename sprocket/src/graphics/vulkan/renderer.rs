@@ -67,31 +67,25 @@ impl Renderer {
 
         vulkan::reset_fences(device, &[self.in_flight_fences[self.current_frame]]);
 
-        if let Err(e) = commandbuffer::CommandBuffer::submit(
-            device,
-            &[&data.commandbuffers[image_index as usize]],
-            &self.context.graphics_queue,
-            &wait_semaphores,
-            &wait_stages,
-            &signal_semaphores,
-            self.in_flight_fences[self.current_frame],
-        ) {
-            error!("Failed to submit command buffers for rendering, '{}'", e);
-            return;
-        }
+        iferr!(
+            "Failed to submit command buffers for rendering",
+            commandbuffer::CommandBuffer::submit(
+                device,
+                &[&data.commandbuffers[image_index as usize]],
+                &self.context.graphics_queue,
+                &wait_semaphores,
+                &wait_stages,
+                &signal_semaphores,
+                self.in_flight_fences[self.current_frame],
+            )
+        );
 
         // Present it to the swapchain
-        let _suboptimal = match data.swapchain.present(
-            image_index,
-            self.context.present_queue,
-            &signal_semaphores,
-        ) {
-            Ok(v) => v,
-            Err(e) => {
-                error!("{}", e);
-                return;
-            }
-        };
+        let _suboptimal = iferr!(
+            "Failed to present to swapchain",
+            data.swapchain
+                .present(image_index, self.context.present_queue, &signal_semaphores,)
+        );
 
         self.current_frame = (self.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
@@ -100,10 +94,10 @@ impl Renderer {
 impl Drop for Renderer {
     fn drop(&mut self) {
         unsafe {
-            self.context
-                .device
-                .device_wait_idle()
-                .expect("Failed to wait on device");
+            iferr!(
+                "Failed to wait on device",
+                self.context.device.device_wait_idle()
+            );
             for semaphore in &self.image_available_semaphores {
                 self.context.device.destroy_semaphore(*semaphore, None);
             }

@@ -27,3 +27,18 @@ macro_rules! unwrap_and_return {
         }
     };
 }
+
+#[macro_use]
+/// Prints an error and returns if Err or unwraps Ok variant
+/// Like expect() but doesn't panic
+macro_rules! iferr {
+    ($m:expr, $e:expr) => {
+        match $e {
+            Ok(v) => v,
+            Err(e) => {
+                error!("{} '{}'", $m, e);
+                return;
+            }
+        }
+    };
+}

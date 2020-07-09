@@ -3,7 +3,6 @@ use super::Pipeline;
 use super::RenderPass;
 use ash::version::DeviceV1_0;
 use ash::vk;
-use log::info;
 use std::borrow::Cow;
 
 pub struct CommandPool {
