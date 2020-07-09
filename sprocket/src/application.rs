@@ -70,7 +70,6 @@ impl Application {
             self.windows.retain(|window| !window.should_close());
 
             if let Some(renderer) = &mut self.renderer {
-                info!("Rendering");
                 renderer.draw_frame();
             }
 
@@ -81,8 +80,6 @@ impl Application {
                     info!("Event: {:?}", event);
                 }
             }
-
-            thread::sleep(Duration::from_millis(200));
         }
     }
 

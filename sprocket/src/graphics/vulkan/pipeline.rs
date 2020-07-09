@@ -83,7 +83,7 @@ impl Pipeline {
             .depth_clamp_enable(false)
             .rasterizer_discard_enable(false)
             .polygon_mode(vk::PolygonMode::FILL)
-            .cull_mode(vk::CullModeFlags::FRONT_AND_BACK)
+            .cull_mode(vk::CullModeFlags::BACK)
             .depth_bias_enable(false)
             .front_face(vk::FrontFace::CLOCKWISE)
             .line_width(1.0)
@@ -97,7 +97,7 @@ impl Pipeline {
             .sample_shading_enable(false)
             .rasterization_samples(vk::SampleCountFlags::TYPE_1)
             .min_sample_shading(1.0)
-            .sample_mask(&[])
+            // .sample_mask(&[vk::SampleMask::MAX])
             .alpha_to_coverage_enable(false)
             .alpha_to_one_enable(false);
 
@@ -109,7 +109,8 @@ impl Pipeline {
             .color_write_mask(
                 vk::ColorComponentFlags::R
                     | vk::ColorComponentFlags::G
-                    | vk::ColorComponentFlags::B,
+                    | vk::ColorComponentFlags::B
+                    | vk::ColorComponentFlags::A,
             )
             .blend_enable(false)
             .src_color_blend_factor(vk::BlendFactor::ONE)

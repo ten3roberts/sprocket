@@ -3,6 +3,7 @@ use super::Pipeline;
 use super::RenderPass;
 use ash::version::DeviceV1_0;
 use ash::vk;
+use log::info;
 use std::borrow::Cow;
 
 pub struct CommandPool {
@@ -125,6 +126,7 @@ impl CommandBuffer {
         wait_semaphores: &[vk::Semaphore],
         wait_stages: &[vk::PipelineStageFlags],
         signal_semaphores: &[vk::Semaphore],
+        fence: vk::Fence,
     ) -> Result<(), Cow<'static, str>> {
         let commandbuffers: Vec<vk::CommandBuffer> = commandbuffers
             .iter()
@@ -138,14 +140,19 @@ impl CommandBuffer {
             .build();
 
         unwrap_and_return!("Failed to submit command buffers", unsafe {
-            device.queue_submit(*queue, &[submit_info], vk::Fence::null())
+            device.queue_submit(*queue, &[submit_info], fence)
         })
     }
 
-    pub fn begin_renderpass(&mut self, renderpass: &RenderPass, framebuffer: &Framebuffer) {
+    pub fn begin_renderpass(
+        &mut self,
+        renderpass: &RenderPass,
+        framebuffer: &Framebuffer,
+        clear_color: crate::math::Vec4,
+    ) {
         let clear_values = [vk::ClearValue {
             color: vk::ClearColorValue {
-                float32: [0.5, 0.5, 0.5, 1.0],
+                float32: [clear_color.x, clear_color.y, clear_color.z, clear_color.w],
             },
         }];
 
@@ -186,5 +193,9 @@ impl CommandBuffer {
         unsafe {
             self.device.cmd_draw(self.commandbuffer, 3, 1, 0, 0);
         };
+    }
+
+    pub fn vk(&self) -> vk::CommandBuffer {
+        self.commandbuffer
     }
 }

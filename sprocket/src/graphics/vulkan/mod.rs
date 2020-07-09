@@ -169,7 +169,11 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
         // Prerecord commandbuffers
         for (i, commandbuffer) in commandbuffers.iter_mut().enumerate() {
             commandbuffer.begin()?;
-            commandbuffer.begin_renderpass(&renderpass, &framebuffers[i]);
+            commandbuffer.begin_renderpass(
+                &renderpass,
+                &framebuffers[i],
+                math::Vec4::new(0.0, 0.0, 0.01, 1.0),
+            );
             commandbuffer.bind_pipeline(&pipeline);
             commandbuffer.draw();
             commandbuffer.end_renderpass();
@@ -478,6 +482,13 @@ fn create_semaphore(device: &ash::Device) -> Result<vk::Semaphore, Cow<'static, 
     let semaphore_info = vk::SemaphoreCreateInfo::builder().build();
     unwrap_and_return!("Failed to create semaphore", unsafe {
         device.create_semaphore(&semaphore_info, None)
+    })
+}
+
+fn create_fence(device: &ash::Device) -> Result<vk::Fence, Cow<'static, str>> {
+    let fence_info = vk::FenceCreateInfo::builder().flags(vk::FenceCreateFlags::SIGNALED);
+    unwrap_and_return!("Failed to create fence", unsafe {
+        device.create_fence(&fence_info, None)
     })
 }
 

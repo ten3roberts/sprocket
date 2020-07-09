@@ -163,10 +163,10 @@ impl Swapchain {
         &self,
         image_index: u32,
         queue: vk::Queue,
-        wait_semaphore: vk::Semaphore,
+        wait_semaphores: &[vk::Semaphore],
     ) -> Result<bool, Cow<'static, str>> {
         let present_info = vk::PresentInfoKHR::builder()
-            .wait_semaphores(&[wait_semaphore])
+            .wait_semaphores(wait_semaphores)
             .swapchains(&[self.swapchain])
             .image_indices(&[image_index])
             .build();
@@ -178,6 +178,10 @@ impl Swapchain {
 
     pub fn vk(&self) -> vk::SwapchainKHR {
         self.swapchain
+    }
+
+    pub fn loader(&self) -> &ash::extensions::khr::Swapchain {
+        &self.swapchain_loader
     }
 
     pub unsafe fn query_support(
