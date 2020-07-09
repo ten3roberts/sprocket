@@ -1,6 +1,6 @@
 use num_derive::FromPrimitive;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Event {
     WindowClose,
     WindowResize(i32, i32),
@@ -20,7 +20,7 @@ pub enum Event {
     Dummy(String),
 }
 
-#[derive(FromPrimitive, Debug)]
+#[derive(FromPrimitive, Debug, PartialEq)]
 pub enum KeyCode {
     Invalid = 0,
     Space = 32,
