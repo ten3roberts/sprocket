@@ -32,23 +32,15 @@ pub mod renderer;
 pub struct VulkanContext {
     entry: ash::Entry,
     instance: ash::Instance,
+    physical_device: vk::PhysicalDevice,
     device: ash::Device,
     debug_utils_loader: ash::extensions::ext::DebugUtils,
     debug_messenger: vk::DebugUtilsMessengerEXT,
     surface_loader: Surface,
     surface: vk::SurfaceKHR,
+    queue_families: QueueFamilies,
     graphics_queue: vk::Queue,
     present_queue: vk::Queue,
-    data: Option<VulkanData>,
-}
-
-struct VulkanData {
-    swapchain: Swapchain,
-    renderpass: RenderPass,
-    pipeline: Pipeline,
-    framebuffers: Vec<Framebuffer>,
-    commandpool: CommandPool,
-    commandbuffers: Vec<CommandBuffer>,
 }
 
 pub struct QueueFamilies {
@@ -127,58 +119,6 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
 
         let graphics_queue = device.get_device_queue(queue_families.graphics.unwrap(), 0);
         let present_queue = device.get_device_queue(queue_families.present.unwrap(), 0);
-        let swapchain = unwrap_or_return!(
-            "Failed to create swapchain",
-            Swapchain::new(
-                &instance,
-                &physical_device,
-                &device,
-                &surface_loader,
-                &surface,
-                &queue_families,
-                window.extent()
-            )
-        );
-
-        let pipeline_spec = pipeline::PipelineSpec {
-            vertex_shader: "./data/shaders/default.vert.spv".into(),
-            fragment_shader: "./data/shaders/default.frag.spv".into(),
-            geometry_shader: "".into(),
-        };
-
-        let renderpass = RenderPass::new(&device, swapchain.format())?;
-
-        let pipeline = Pipeline::new(&device, pipeline_spec, window.extent(), &renderpass)?;
-
-        let mut framebuffers = Vec::with_capacity(swapchain.image_count());
-        for i in 0..swapchain.image_count() {
-            framebuffers.push(Framebuffer::new(
-                &device,
-                &[swapchain.image(i)],
-                &renderpass,
-                swapchain.extent(),
-            )?)
-        }
-
-        let commandpool =
-            CommandPool::new(&device, queue_families.graphics.unwrap(), false, false)?;
-
-        let mut commandbuffers =
-            CommandBuffer::new_primary(&device, &commandpool, swapchain.image_count())?;
-
-        // Prerecord commandbuffers
-        for (i, commandbuffer) in commandbuffers.iter_mut().enumerate() {
-            commandbuffer.begin()?;
-            commandbuffer.begin_renderpass(
-                &renderpass,
-                &framebuffers[i],
-                math::Vec4::new(0.0, 0.0, 0.01, 1.0),
-            );
-            commandbuffer.bind_pipeline(&pipeline);
-            commandbuffer.draw();
-            commandbuffer.end_renderpass();
-            commandbuffer.end()?;
-        }
 
         Ok(VulkanContext {
             entry,
@@ -187,17 +127,11 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
             debug_messenger,
             surface_loader,
             surface,
+            physical_device,
             device,
+            queue_families,
             graphics_queue,
             present_queue,
-            data: Some(VulkanData {
-                swapchain,
-                renderpass,
-                pipeline,
-                framebuffers,
-                commandpool,
-                commandbuffers,
-            }),
         })
     }
 
@@ -514,7 +448,6 @@ impl Drop for VulkanContext {
         unsafe {
             // Drop data before device
             // This will later migrate out to materials and alike
-            self.data = None;
             self.device.device_wait_idle().unwrap();
             self.device.destroy_device(None);
             self.surface_loader.destroy_surface(self.surface, None);

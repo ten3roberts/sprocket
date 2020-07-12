@@ -10,8 +10,8 @@ pub struct Application {
     windows: Vec<Window>,
     event_receiver: mpsc::Receiver<Event>,
     event_sender: mpsc::Sender<Event>,
-    graphics_context: Option<graphics::GraphicsContext>,
     renderer: Option<Renderer>,
+    graphics_context: Option<graphics::GraphicsContext>,
 }
 
 impl Application {
@@ -42,7 +42,7 @@ impl Application {
         // Create vulkan renderer if vulkan
         if let graphics::GraphicsContext::Vulkan(context) = self.graphics_context.as_ref().unwrap()
         {
-            self.renderer = match Renderer::new(context.clone()) {
+            self.renderer = match Renderer::new(context.clone(), &self.windows[0]) {
                 Ok(renderer) => Some(renderer),
                 Err(e) => {
                     error!("Failed to create renderer '{}'", e);

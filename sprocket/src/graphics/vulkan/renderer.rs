@@ -13,10 +13,20 @@ pub struct Renderer {
     in_flight_fences: Vec<vk::Fence>,
     images_in_flight: Vec<vk::Fence>,
     current_frame: usize,
+
+    swapchain: Swapchain,
+    renderpass: RenderPass,
+    commandpool: CommandPool,
+    commandbuffers: Vec<CommandBuffer>,
+    pipeline: Pipeline,
+    framebuffers: Vec<Framebuffer>,
 }
 
 impl Renderer {
-    pub fn new(context: Arc<VulkanContext>) -> Result<Renderer, Cow<'static, str>> {
+    pub fn new(
+        context: Arc<VulkanContext>,
+        window: &Window,
+    ) -> Result<Renderer, Cow<'static, str>> {
         let mut image_available_semaphores = Vec::new();
         let mut render_finished_semaphores = Vec::new();
         let mut in_flight_fences = Vec::new();
@@ -29,8 +39,65 @@ impl Renderer {
             in_flight_fences.push(vulkan::create_fence(&context.device)?);
         }
 
-        for _ in 0..context.data.as_ref().unwrap().swapchain.image_count() {
+        let swapchain = unwrap_or_return!(
+            "Failed to create swapchain",
+            Swapchain::new(
+                &context.instance,
+                &context.physical_device,
+                &context.device,
+                &context.surface_loader,
+                &context.surface,
+                &context.queue_families,
+                window.extent()
+            )
+        );
+
+        for _ in 0..swapchain.image_count() {
             images_in_flight.push(vk::Fence::null());
+        }
+
+        let renderpass = RenderPass::new(&context.device, swapchain.format())?;
+
+        let pipeline_spec = pipeline::PipelineSpec {
+            vertex_shader: "./data/shaders/default.vert.spv".into(),
+            fragment_shader: "./data/shaders/default.frag.spv".into(),
+            geometry_shader: "".into(),
+        };
+
+        let pipeline = Pipeline::new(&context.device, pipeline_spec, window.extent(), &renderpass)?;
+
+        let commandpool = CommandPool::new(
+            &context.device,
+            context.queue_families.graphics.unwrap(),
+            false,
+            false,
+        )?;
+
+        let mut framebuffers = Vec::with_capacity(swapchain.image_count());
+        for i in 0..swapchain.image_count() {
+            framebuffers.push(Framebuffer::new(
+                &context.device,
+                &[swapchain.image(i)],
+                &renderpass,
+                swapchain.extent(),
+            )?)
+        }
+
+        let mut commandbuffers =
+            CommandBuffer::new_primary(&context.device, &commandpool, swapchain.image_count())?;
+
+        // Prerecord commandbuffers
+        for (i, commandbuffer) in commandbuffers.iter_mut().enumerate() {
+            commandbuffer.begin()?;
+            commandbuffer.begin_renderpass(
+                &renderpass,
+                &framebuffers[i],
+                math::Vec4::new(0.0, 0.0, 0.01, 1.0),
+            );
+            commandbuffer.bind_pipeline(&pipeline);
+            commandbuffer.draw();
+            commandbuffer.end_renderpass();
+            commandbuffer.end()?;
         }
 
         Ok(Renderer {
@@ -40,16 +107,21 @@ impl Renderer {
             in_flight_fences,
             images_in_flight,
             current_frame: 0,
+            pipeline,
+            swapchain,
+            commandbuffers,
+            commandpool,
+            renderpass,
+            framebuffers,
         })
     }
 
     pub fn draw_frame(&mut self) {
-        let data = self.context.data.as_ref().unwrap();
         let device = &self.context.device;
 
         vulkan::wait_for_fences(device, &[self.in_flight_fences[self.current_frame]], true);
 
-        let (image_index, _) = data
+        let (image_index, _) = self
             .swapchain
             .acquire_next_image(&self.image_available_semaphores[self.current_frame]);
 
@@ -71,7 +143,7 @@ impl Renderer {
             "Failed to submit command buffers for rendering",
             commandbuffer::CommandBuffer::submit(
                 device,
-                &[&data.commandbuffers[image_index as usize]],
+                &[&self.commandbuffers[image_index as usize]],
                 &self.context.graphics_queue,
                 &wait_semaphores,
                 &wait_stages,
@@ -83,7 +155,7 @@ impl Renderer {
         // Present it to the swapchain
         let _suboptimal = iferr!(
             "Failed to present to swapchain",
-            data.swapchain
+            self.swapchain
                 .present(image_index, self.context.present_queue, &signal_semaphores,)
         );
 
