@@ -199,15 +199,14 @@ fn create_shader_module(
     device: &ash::Device,
     filename: &str,
 ) -> Result<vk::ShaderModule, Cow<'static, str>> {
-    let code = match fs::read(filename) {
+    let mut file = unwrap_or_return!("Failed to open file", fs::File::open(filename));
+
+    let code = match ash::util::read_spv(&mut file) {
         Ok(code) => code,
         Err(e) => return errfmt!("Failed to read file {}, '{}'", filename, e),
     };
-    let create_info = vk::ShaderModuleCreateInfo {
-        code_size: code.len(),
-        p_code: unsafe { std::mem::transmute(code.as_ptr()) },
-        ..Default::default()
-    };
+
+    let create_info = vk::ShaderModuleCreateInfo::builder().code(&code);
 
     unwrap_and_return!("Failed to create shader module", unsafe {
         device.create_shader_module(&create_info, None)
