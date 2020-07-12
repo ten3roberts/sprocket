@@ -66,7 +66,7 @@ impl Application {
                 .for_each(|window| window.process_events());
 
             if let Some(renderer) = &mut self.renderer {
-                renderer.draw_frame();
+                renderer.draw_frame(&self.windows[0]);
             }
 
             // Receive and handle events

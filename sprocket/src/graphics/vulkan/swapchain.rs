@@ -147,20 +147,14 @@ impl Swapchain {
     }
 
     /// Returns the index to the next available image in the swapchain
-    pub fn acquire_next_image(&self, semaphore: &vk::Semaphore) -> (u32, bool) {
+    pub fn acquire_next_image(&self, semaphore: &vk::Semaphore) -> Result<(u32, bool), vk::Result> {
         unsafe {
-            match self.swapchain_loader.acquire_next_image(
+            self.swapchain_loader.acquire_next_image(
                 self.swapchain,
                 std::u64::MAX,
                 *semaphore,
                 vk::Fence::null(),
-            ) {
-                Ok((image, suboptimal)) => return (image, suboptimal),
-                Err(e) => {
-                    error!("Failed to acquire next image from swapchain '{}'", e);
-                    return (0, false);
-                }
-            }
+            )
         }
     }
 
@@ -170,16 +164,14 @@ impl Swapchain {
         image_index: u32,
         queue: vk::Queue,
         wait_semaphores: &[vk::Semaphore],
-    ) -> Result<bool, Cow<'static, str>> {
+    ) -> Result<bool, vk::Result> {
         let present_info = vk::PresentInfoKHR::builder()
             .wait_semaphores(wait_semaphores)
             .swapchains(&[self.swapchain])
             .image_indices(&[image_index])
             .build();
 
-        unwrap_and_return!("Failed to present to swapchain", unsafe {
-            self.swapchain_loader.queue_present(queue, &present_info)
-        })
+        unsafe { self.swapchain_loader.queue_present(queue, &present_info) }
     }
 
     pub fn vk(&self) -> vk::SwapchainKHR {

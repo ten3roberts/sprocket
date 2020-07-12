@@ -13,7 +13,10 @@ pub struct Renderer {
     in_flight_fences: Vec<vk::Fence>,
     images_in_flight: Vec<vk::Fence>,
     current_frame: usize,
+    data: Data,
+}
 
+struct Data {
     swapchain: Swapchain,
     renderpass: RenderPass,
     commandpool: CommandPool,
@@ -39,6 +42,122 @@ impl Renderer {
             in_flight_fences.push(vulkan::create_fence(&context.device)?);
         }
 
+        let data = Self::create_data(&context, window)?;
+
+        for _ in 0..data.swapchain.image_count() {
+            images_in_flight.push(vk::Fence::null());
+        }
+
+        Ok(Renderer {
+            context,
+            image_available_semaphores,
+            render_finished_semaphores,
+            in_flight_fences,
+            images_in_flight,
+            current_frame: 0,
+            data,
+        })
+    }
+
+    pub fn draw_frame(&mut self, window: &Window) {
+        let device = &self.context.device;
+
+        vulkan::wait_for_fences(device, &[self.in_flight_fences[self.current_frame]], true);
+
+        let (image_index, suboptimal) = match self
+            .data
+            .swapchain
+            .acquire_next_image(&self.image_available_semaphores[self.current_frame])
+        {
+            Ok(v) => v,
+            Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                self.recreate(window);
+                return;
+            }
+            Err(e) => {
+                error!("Failed to present to swapchain '{}'", e);
+                return;
+            }
+        };
+
+        if suboptimal {
+            self.recreate(window);
+            return;
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        // Check if a previous frame is using this image (i.e. there is its fence to wait on)
+        if self.images_in_flight[image_index as usize] != vk::Fence::null() {
+            vulkan::wait_for_fences(device, &[self.images_in_flight[image_index as usize]], true)
+        }
+
+        self.images_in_flight[image_index as usize] = self.in_flight_fences[self.current_frame];
+
+        // Submit the primary command buffer
+        let wait_semaphores = [self.image_available_semaphores[self.current_frame]];
+        let signal_semaphores = [self.render_finished_semaphores[self.current_frame]];
+        let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+
+        vulkan::reset_fences(device, &[self.in_flight_fences[self.current_frame]]);
+
+        iferr!(
+            "Failed to submit command buffers for rendering",
+            commandbuffer::CommandBuffer::submit(
+                device,
+                &[&self.data.commandbuffers[image_index as usize]],
+                &self.context.graphics_queue,
+                &wait_semaphores,
+                &wait_stages,
+                &signal_semaphores,
+                self.in_flight_fences[self.current_frame],
+            )
+        );
+
+        // Present it to the swapchain
+        let suboptimal = match self.data.swapchain.present(
+            image_index,
+            self.context.present_queue,
+            &signal_semaphores,
+        ) {
+            Ok(v) => v,
+            Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                self.recreate(window);
+                return;
+            }
+            Err(e) => {
+                error!("Failed to present to swapchain '{}'", e);
+                return;
+            }
+        };
+
+        if suboptimal {
+            self.recreate(window);
+            return;
+        }
+
+        self.current_frame = (self.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+    }
+
+    fn recreate(&mut self, window: &Window) {
+        info!("Recreating renderer");
+        unsafe {
+            iferr!(
+                "Failed to wait for device",
+                self.context.device.device_wait_idle()
+            );
+        }
+
+        self.data = iferr!(
+            "Failed to recreate renderer",
+            Self::create_data(&self.context, window)
+        );
+    }
+
+    fn create_data(
+        context: &Arc<VulkanContext>,
+        window: &Window,
+    ) -> Result<Data, Cow<'static, str>> {
         let swapchain = unwrap_or_return!(
             "Failed to create swapchain",
             Swapchain::new(
@@ -51,10 +170,6 @@ impl Renderer {
                 window.extent()
             )
         );
-
-        for _ in 0..swapchain.image_count() {
-            images_in_flight.push(vk::Fence::null());
-        }
 
         let renderpass = RenderPass::new(&context.device, swapchain.format())?;
 
@@ -100,66 +215,14 @@ impl Renderer {
             commandbuffer.end()?;
         }
 
-        Ok(Renderer {
-            context,
-            image_available_semaphores,
-            render_finished_semaphores,
-            in_flight_fences,
-            images_in_flight,
-            current_frame: 0,
-            pipeline,
+        Ok(Data {
             swapchain,
-            commandbuffers,
-            commandpool,
             renderpass,
+            commandpool,
+            commandbuffers,
+            pipeline,
             framebuffers,
         })
-    }
-
-    pub fn draw_frame(&mut self) {
-        let device = &self.context.device;
-
-        vulkan::wait_for_fences(device, &[self.in_flight_fences[self.current_frame]], true);
-
-        let (image_index, _) = self
-            .swapchain
-            .acquire_next_image(&self.image_available_semaphores[self.current_frame]);
-
-        // Check if a previous frame is using this image (i.e. there is its fence to wait on)
-        if self.images_in_flight[image_index as usize] != vk::Fence::null() {
-            vulkan::wait_for_fences(device, &[self.images_in_flight[image_index as usize]], true)
-        }
-
-        self.images_in_flight[image_index as usize] = self.in_flight_fences[self.current_frame];
-
-        // Submit the primary command buffer
-        let wait_semaphores = [self.image_available_semaphores[self.current_frame]];
-        let signal_semaphores = [self.render_finished_semaphores[self.current_frame]];
-        let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
-
-        vulkan::reset_fences(device, &[self.in_flight_fences[self.current_frame]]);
-
-        iferr!(
-            "Failed to submit command buffers for rendering",
-            commandbuffer::CommandBuffer::submit(
-                device,
-                &[&self.commandbuffers[image_index as usize]],
-                &self.context.graphics_queue,
-                &wait_semaphores,
-                &wait_stages,
-                &signal_semaphores,
-                self.in_flight_fences[self.current_frame],
-            )
-        );
-
-        // Present it to the swapchain
-        let _suboptimal = iferr!(
-            "Failed to present to swapchain",
-            self.swapchain
-                .present(image_index, self.context.present_queue, &signal_semaphores,)
-        );
-
-        self.current_frame = (self.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 }
 
