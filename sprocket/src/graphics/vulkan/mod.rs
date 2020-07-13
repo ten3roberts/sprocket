@@ -29,6 +29,9 @@ use commandbuffer::CommandPool;
 
 pub mod renderer;
 
+pub mod vertexbuffer;
+pub use vertexbuffer::Vertex;
+pub use vertexbuffer::VertexBuffer;
 pub struct VulkanContext {
     entry: ash::Entry,
     instance: ash::Instance,

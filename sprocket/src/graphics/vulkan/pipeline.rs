@@ -1,3 +1,4 @@
+use super::vertexbuffer::Vertex;
 use super::RenderPass;
 use crate::graphics::Extent2D;
 use ash::version::DeviceV1_0;
@@ -47,9 +48,11 @@ impl Pipeline {
         let shader_stages = [vertex_shader_info, fragment_shader_info];
 
         // Vertex input
+        let binding_descriptions = [Vertex::binding_description()];
+        let attribute_descriptions = Vertex::attribute_descriptions();
         let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::builder()
-            .vertex_binding_descriptions(&[])
-            .vertex_attribute_descriptions(&[]);
+            .vertex_binding_descriptions(&binding_descriptions)
+            .vertex_attribute_descriptions(&attribute_descriptions);
 
         // Input assembly
         let input_assembly = vk::PipelineInputAssemblyStateCreateInfo::builder()

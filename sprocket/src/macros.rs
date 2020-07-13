@@ -42,3 +42,13 @@ macro_rules! iferr {
         }
     };
 }
+
+#[macro_use]
+/// Returns the offset in bytes of the specified field in the struct
+macro_rules! offsetof {
+    ($type:ty, $field:ident) => {{
+        let field = unsafe { &(*(std::ptr::null() as *const $type)).$field as *const _ };
+
+        field as usize
+    }};
+}

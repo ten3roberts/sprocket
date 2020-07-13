@@ -23,6 +23,7 @@ struct Data {
     commandbuffers: Vec<CommandBuffer>,
     pipeline: Pipeline,
     framebuffers: Vec<Framebuffer>,
+    vertexbuffer: VertexBuffer,
 }
 
 impl Renderer {
@@ -201,6 +202,19 @@ impl Renderer {
         let mut commandbuffers =
             CommandBuffer::new_primary(&context.device, &commandpool, swapchain.image_count())?;
 
+        let vertices = [
+            Vertex::new(Vec2::new(0.0, -0.5), Vec3::right()),
+            Vertex::new(Vec2::new(0.5, 0.5), Vec3::up()),
+            Vertex::new(Vec2::new(-0.5, 0.5), Vec3::forward()),
+        ];
+
+        let vertexbuffer = VertexBuffer::new(
+            &context.instance,
+            &context.device,
+            context.physical_device,
+            &vertices,
+        )?;
+
         // Prerecord commandbuffers
         for (i, commandbuffer) in commandbuffers.iter_mut().enumerate() {
             commandbuffer.begin()?;
@@ -210,6 +224,7 @@ impl Renderer {
                 math::Vec4::new(0.0, 0.0, 0.01, 1.0),
             );
             commandbuffer.bind_pipeline(&pipeline);
+            commandbuffer.bind_vertexbuffer(&vertexbuffer);
             commandbuffer.draw();
             commandbuffer.end_renderpass();
             commandbuffer.end()?;
@@ -222,6 +237,7 @@ impl Renderer {
             commandbuffers,
             pipeline,
             framebuffers,
+            vertexbuffer,
         })
     }
 }

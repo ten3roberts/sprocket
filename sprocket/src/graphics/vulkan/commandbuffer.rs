@@ -1,6 +1,7 @@
 use super::Framebuffer;
 use super::Pipeline;
 use super::RenderPass;
+use super::VertexBuffer;
 use ash::version::DeviceV1_0;
 use ash::vk;
 use std::borrow::Cow;
@@ -186,6 +187,17 @@ impl CommandBuffer {
                 pipeline.vk(),
             )
         };
+    }
+
+    pub fn bind_vertexbuffer(&self, vertexbuffer: &VertexBuffer) {
+        unsafe {
+            self.device.cmd_bind_vertex_buffers(
+                self.commandbuffer,
+                0,
+                &[vertexbuffer.buffer()],
+                &[0],
+            )
+        }
     }
 
     pub fn draw(&self) {
