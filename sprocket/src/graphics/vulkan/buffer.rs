@@ -1,11 +1,14 @@
+use super::CommandBuffer;
+use super::CommandPool;
 use ash::version::{DeviceV1_0, InstanceV1_0};
 use ash::vk;
 
+// Creates a new low level vulkan buffer
 pub fn create(
     instance: &ash::Instance,
     device: &ash::Device,
     physical_device: vk::PhysicalDevice,
-    size: u64,
+    size: vk::DeviceSize,
     usage: vk::BufferUsageFlags,
     properties: vk::MemoryPropertyFlags,
 ) -> Result<(vk::Buffer, vk::DeviceMemory), vk::Result> {
@@ -36,6 +39,52 @@ pub fn create(
     unsafe { device.bind_buffer_memory(buffer, memory, 0)? };
 
     Ok((buffer, memory))
+}
+
+// Copies the contents of one buffer to another
+pub fn copy(
+    device: &ash::Device,
+    queue: vk::Queue,
+    commandpool: &CommandPool,
+    src_buffer: vk::Buffer,
+    dst_buffer: vk::Buffer,
+    size: vk::DeviceSize,
+) {
+    let commandbuffer = &mut CommandBuffer::new_primary(device, commandpool, 1).unwrap()[0];
+    // let commandbuffer = &mut commandbuffer[0];
+
+    commandbuffer
+        .begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
+        .unwrap();
+
+    let region = vk::BufferCopy::builder()
+        .src_offset(0)
+        .dst_offset(0)
+        .size(size)
+        .build();
+    unsafe { device.cmd_copy_buffer(commandbuffer.vk(), src_buffer, dst_buffer, &[region]) }
+
+    commandbuffer.end().unwrap();
+
+    CommandBuffer::submit(
+        device,
+        &[commandbuffer],
+        queue,
+        &[],
+        &[],
+        &[],
+        vk::Fence::null(),
+    )
+    .unwrap();
+
+    unsafe { device.queue_wait_idle(queue).unwrap() }
+}
+
+pub fn destroy(device: &ash::Device, buffer: vk::Buffer, memory: vk::DeviceMemory) {
+    unsafe {
+        device.destroy_buffer(buffer, None);
+        device.free_memory(memory, None);
+    }
 }
 
 fn find_memory_type(

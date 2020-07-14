@@ -107,7 +107,7 @@ impl Renderer {
             commandbuffer::CommandBuffer::submit(
                 device,
                 &[&self.data.commandbuffers[image_index as usize]],
-                &self.context.graphics_queue,
+                self.context.graphics_queue,
                 &wait_semaphores,
                 &wait_stages,
                 &signal_semaphores,
@@ -211,13 +211,15 @@ impl Renderer {
         let vertexbuffer = VertexBuffer::new(
             &context.instance,
             &context.device,
+            context.graphics_queue,
             context.physical_device,
+            &commandpool,
             &vertices,
         )?;
 
         // Prerecord commandbuffers
         for (i, commandbuffer) in commandbuffers.iter_mut().enumerate() {
-            commandbuffer.begin()?;
+            commandbuffer.begin(Default::default())?;
             commandbuffer.begin_renderpass(
                 &renderpass,
                 &framebuffers[i],

@@ -1,6 +1,7 @@
 use super::buffer;
+use super::CommandPool;
 use crate::math::*;
-use ash::version::{DeviceV1_0, InstanceV1_0};
+use ash::version::DeviceV1_0;
 use ash::vk;
 use std::borrow::Cow;
 
@@ -58,12 +59,44 @@ impl VertexBuffer {
     pub fn new(
         instance: &ash::Instance,
         device: &ash::Device,
+        queue: vk::Queue,
         physical_device: vk::PhysicalDevice,
+        commandpool: &CommandPool,
         vertices: &[Vertex],
     ) -> Result<VertexBuffer, Cow<'static, str>> {
         let buffer_size = match vertices.len() {
             0 => 1024,
             n => (n * std::mem::size_of_val(&vertices[0])) as u64,
+        };
+
+        let (staging_buffer, staging_memory) = unwrap_or_return!(
+            "Failed to create staging buffer or memory",
+            buffer::create(
+                instance,
+                device,
+                physical_device,
+                buffer_size,
+                vk::BufferUsageFlags::TRANSFER_SRC,
+                vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+            )
+        );
+        // Copy the data into the buffer
+        unsafe {
+            let data = unwrap_or_return!(
+                "Failed to map vertex buffer memory",
+                device.map_memory(
+                    staging_memory,
+                    0,
+                    buffer_size,
+                    vk::MemoryMapFlags::default(),
+                )
+            );
+            std::ptr::copy_nonoverlapping(
+                vertices.as_ptr() as *const std::ffi::c_void,
+                data,
+                buffer_size as usize,
+            );
+            device.unmap_memory(staging_memory);
         };
 
         let (buffer, memory) = unwrap_or_return!(
@@ -73,25 +106,21 @@ impl VertexBuffer {
                 device,
                 physical_device,
                 buffer_size,
-                vk::BufferUsageFlags::VERTEX_BUFFER,
-                vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT
+                vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
+                vk::MemoryPropertyFlags::DEVICE_LOCAL
             )
         );
 
-        // Copy the data into the buffer
-        let data = unwrap_or_return!("Failed to map vertex buffer memory", unsafe {
-            device.map_memory(memory, 0, buffer_size, vk::MemoryMapFlags::default())
-        });
+        buffer::copy(
+            device,
+            queue,
+            commandpool,
+            staging_buffer,
+            buffer,
+            buffer_size,
+        );
 
-        unsafe {
-            std::ptr::copy_nonoverlapping(
-                vertices.as_ptr() as *const std::ffi::c_void,
-                data,
-                buffer_size as usize,
-            )
-        };
-
-        unsafe { device.unmap_memory(memory) }
+        buffer::destroy(device, staging_buffer, staging_memory);
 
         Ok(VertexBuffer {
             device: device.clone(),
@@ -108,9 +137,6 @@ impl VertexBuffer {
 
 impl Drop for VertexBuffer {
     fn drop(&mut self) {
-        unsafe {
-            self.device.destroy_buffer(self.buffer, None);
-            self.device.free_memory(self.memory, None);
-        }
+        buffer::destroy(&self.device, self.buffer, self.memory);
     }
 }

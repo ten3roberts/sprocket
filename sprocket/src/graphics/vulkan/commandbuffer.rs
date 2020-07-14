@@ -94,8 +94,13 @@ impl CommandBuffer {
             .collect())
     }
 
-    pub fn begin(&mut self) -> Result<(), Cow<'static, str>> {
-        let begin_info = vk::CommandBufferBeginInfo::builder().build();
+    pub fn begin(
+        &mut self,
+        begin_info: vk::CommandBufferUsageFlags,
+    ) -> Result<(), Cow<'static, str>> {
+        let begin_info = vk::CommandBufferBeginInfo::builder()
+            .flags(begin_info)
+            .build();
         unwrap_or_return!("Failed to begin recording of command buffer", unsafe {
             self.device
                 .begin_command_buffer(self.commandbuffer, &begin_info)
@@ -122,7 +127,7 @@ impl CommandBuffer {
     pub fn submit(
         device: &ash::Device,
         commandbuffers: &[&CommandBuffer],
-        queue: &vk::Queue,
+        queue: vk::Queue,
         wait_semaphores: &[vk::Semaphore],
         wait_stages: &[vk::PipelineStageFlags],
         signal_semaphores: &[vk::Semaphore],
@@ -140,7 +145,7 @@ impl CommandBuffer {
             .build();
 
         unwrap_and_return!("Failed to submit command buffers", unsafe {
-            device.queue_submit(*queue, &[submit_info], fence)
+            device.queue_submit(queue, &[submit_info], fence)
         })
     }
 
