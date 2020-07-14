@@ -32,6 +32,9 @@ pub mod renderer;
 pub mod vertexbuffer;
 pub use vertexbuffer::Vertex;
 pub use vertexbuffer::VertexBuffer;
+
+mod buffer;
+
 pub struct VulkanContext {
     entry: ash::Entry,
     instance: ash::Instance,

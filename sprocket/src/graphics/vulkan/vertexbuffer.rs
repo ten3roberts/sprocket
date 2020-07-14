@@ -1,3 +1,4 @@
+use super::buffer;
 use crate::math::*;
 use ash::version::{DeviceV1_0, InstanceV1_0};
 use ash::vk;
@@ -65,48 +66,28 @@ impl VertexBuffer {
             n => (n * std::mem::size_of_val(&vertices[0])) as u64,
         };
 
-        let buffer_info = vk::BufferCreateInfo::builder()
-            .size(buffer_size)
-            .usage(vk::BufferUsageFlags::VERTEX_BUFFER)
-            .sharing_mode(vk::SharingMode::EXCLUSIVE);
-
-        let buffer = unwrap_or_return!("Failed to create vertex buffer", unsafe {
-            device.create_buffer(&buffer_info, None)
-        });
-
-        let memory_requirements = unsafe { device.get_buffer_memory_requirements(buffer) };
-        let memory_type_index = match find_memory_type(
-            instance,
-            physical_device,
-            memory_requirements.memory_type_bits,
-            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
-        ) {
-            Some(v) => v,
-            None => return Err("Failed to find suitable memory type for vertex buffer".into()),
-        };
-
-        let alloc_info = vk::MemoryAllocateInfo::builder()
-            .allocation_size(memory_requirements.size)
-            .memory_type_index(memory_type_index);
-
-        let memory = unwrap_or_return!("Failed to allocate vertex buffer memory", unsafe {
-            device.allocate_memory(&alloc_info, None)
-        });
-
-        unwrap_or_return!("Failed to bind vertex buffer memory", unsafe {
-            device.bind_buffer_memory(buffer, memory, 0)
-        });
+        let (buffer, memory) = unwrap_or_return!(
+            "Failed to create buffer or memory",
+            buffer::create(
+                instance,
+                device,
+                physical_device,
+                buffer_size,
+                vk::BufferUsageFlags::VERTEX_BUFFER,
+                vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT
+            )
+        );
 
         // Copy the data into the buffer
         let data = unwrap_or_return!("Failed to map vertex buffer memory", unsafe {
-            device.map_memory(memory, 0, buffer_info.size, vk::MemoryMapFlags::default())
+            device.map_memory(memory, 0, buffer_size, vk::MemoryMapFlags::default())
         });
 
         unsafe {
             std::ptr::copy_nonoverlapping(
                 vertices.as_ptr() as *const std::ffi::c_void,
                 data,
-                buffer_info.size as usize,
+                buffer_size as usize,
             )
         };
 
@@ -116,7 +97,7 @@ impl VertexBuffer {
             device: device.clone(),
             buffer,
             memory,
-            size: buffer_info.size,
+            size: buffer_size,
         })
     }
 
@@ -132,25 +113,4 @@ impl Drop for VertexBuffer {
             self.device.free_memory(self.memory, None);
         }
     }
-}
-
-fn find_memory_type(
-    instance: &ash::Instance,
-    physical_device: vk::PhysicalDevice,
-    type_filter: u32,
-    properties: vk::MemoryPropertyFlags,
-) -> Option<u32> {
-    let mem_properties = unsafe { instance.get_physical_device_memory_properties(physical_device) };
-    for i in 0..mem_properties.memory_type_count {
-        if type_filter & (1 << i) != 0
-            && (mem_properties.memory_types[i as usize]
-                .property_flags
-                .as_raw()
-                & properties.as_raw()
-                != 0)
-        {
-            return Some(i);
-        }
-    }
-    None
 }
