@@ -52,7 +52,9 @@ impl std::fmt::Display for Error {
                 write!(f, "Failed to read SPV from file {:?}'{:?}'", path, e)
             }
             Error::NotRecording => write!(f, "Command buffer is not in recording state"),
-            Error::MissingMemoryType(properties) => write!(f, "Cannot find GPU memory type supporting {:?}", properties),
+            Error::MissingMemoryType(properties) => {
+                write!(f, "Cannot find GPU memory type supporting {:?}", properties)
+            }
         }
 
         // write!(f, "({}, {}, {}, {})", self.x, self.y, self.z, self.w)

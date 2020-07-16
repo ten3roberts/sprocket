@@ -30,9 +30,7 @@ pub fn init(api: Api, window: &Window) -> Result<GraphicsContext> {
             Ok(context) => Ok(GraphicsContext::Vulkan(Arc::new(context))),
             Err(f) => Err(f),
         },
-        Api::OpenGL => {
-            Err(Error::UnsupportedAPI(api))
-        }
+        Api::OpenGL => Err(Error::UnsupportedAPI(api)),
     }
 }
 

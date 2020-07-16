@@ -4,7 +4,7 @@ use crate::math::*;
 use ash::version::DeviceV1_0;
 use ash::vk;
 
-use super::{Result};
+use super::Result;
 
 pub struct Vertex {
     position: Vec2,
