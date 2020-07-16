@@ -191,8 +191,6 @@ unsafe fn create_instance(entry: &ash::Entry, layers: &[&str]) -> Result<ash::In
     }
     extensions.push(b"VK_EXT_debug_utils\0".as_ptr() as *const i8);
 
-    info!("Extensions: {:?}", extensions);
-
     // Convert the slice to *const *const null terminated
     let layers = utils::vec_to_null_terminated(layers);
     let layers = utils::vec_to_carray(&layers);
