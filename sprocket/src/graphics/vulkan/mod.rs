@@ -203,7 +203,7 @@ fn check_validation_layer_support(entry: &ash::Entry, layers: &[&str]) -> Result
             }
         }
         if !found {
-            return Err(Error::LayerMissing((*layer).to_owned()));
+            return Err(Error::MissingLayer((*layer).to_owned()));
         }
     }
 

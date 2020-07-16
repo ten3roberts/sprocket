@@ -10,11 +10,12 @@ pub enum Error {
     VulkanError(vk::Result),
     GLFWError(glfw::Error),
     InstanceError(ash::InstanceError),
-    LayerMissing(String),
+    MissingLayer(String),
     UnsupportedAPI(super::Api),
     UnsupportedGPU(super::Api),
     SPVReadError(std::io::Error, String),
     NotRecording,
+    MissingMemoryType(vk::MemoryPropertyFlags),
 }
 
 impl From<vk::Result> for Error {
@@ -42,7 +43,7 @@ impl std::fmt::Display for Error {
             Error::VulkanError(e) => write!(f, "Vulkan error {:?}", e),
             Error::InstanceError(e) => write!(f, "Instance creation error {:?}", e),
             Error::GLFWError(e) => write!(f, "GLFW error {:?}", e),
-            Error::LayerMissing(l) => write!(f, "Cannot locate {} on the system", l),
+            Error::MissingLayer(l) => write!(f, "Cannot locate {} on the system", l),
             Error::UnsupportedAPI(a) => write!(f, "{:?} is not supported", a),
             Error::UnsupportedGPU(a) => {
                 write!(f, "Unable to find a suitable GPU supporting {:?}", a)
@@ -51,6 +52,7 @@ impl std::fmt::Display for Error {
                 write!(f, "Failed to read SPV from file {:?}'{:?}'", path, e)
             }
             Error::NotRecording => write!(f, "Command buffer is not in recording state"),
+            Error::MissingMemoryType(properties) => write!(f, "Cannot find GPU memory type supporting {:?}", properties),
         }
 
         // write!(f, "({}, {}, {}, {})", self.x, self.y, self.z, self.w)

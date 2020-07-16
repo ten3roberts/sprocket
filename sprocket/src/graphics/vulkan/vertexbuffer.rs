@@ -112,7 +112,7 @@ impl VertexBuffer {
             staging_buffer,
             buffer,
             buffer_size,
-        );
+        )?;
 
         buffer::destroy(device, staging_buffer, staging_memory);
 
