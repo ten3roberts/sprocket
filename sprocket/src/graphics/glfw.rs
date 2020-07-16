@@ -2,7 +2,9 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(dead_code)]
+use num_derive::FromPrimitive;
 use std::ffi;
+
 #[link(name = "glfw")]
 #[no_mangle]
 extern "C" {
@@ -149,3 +151,16 @@ pub const GLFW_LOSE_CONTEXT_ON_RESET: i32 = 0x00031002;
 pub const GLFW_RELEASE: i32 = 0;
 pub const GLFW_PRESS: i32 = 1;
 pub const GLFW_REPEAT: i32 = 2;
+
+#[derive(FromPrimitive, Debug, PartialEq)]
+pub enum Error {
+    GLFWNotInitialized = 0x00010001,
+    GLFWNoCurrentContext = 0x00010002,
+    GLFWInvalidEnum = 0x00010003,
+    GLFWInvalidValue = 0x00010004,
+    GLFWApiUnavailable = 0x00010006,
+    GLFWVersionUnavailable = 0x00010007,
+    GLFWPlatformError = 0x00010008,
+    GLFWFormatUnavailable = 0x00010009,
+    GLFWNoWindowContext = 0x0001000A,
+}

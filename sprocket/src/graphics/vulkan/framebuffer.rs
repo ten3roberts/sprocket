@@ -3,7 +3,7 @@ use super::RenderPass;
 use crate::graphics::Extent2D;
 use ash::version::DeviceV1_0;
 use ash::vk;
-use std::borrow::Cow;
+use super::{Result};
 
 pub struct Framebuffer {
     device: ash::Device,
@@ -17,7 +17,7 @@ impl Framebuffer {
         attachments: &[&Texture],
         renderpass: &RenderPass,
         extent: Extent2D,
-    ) -> Result<Framebuffer, Cow<'static, str>> {
+    ) -> Result<Framebuffer> {
         let attachment_views: Vec<vk::ImageView> = attachments
             .iter()
             .map(|attachment| attachment.image_view())
@@ -37,9 +37,9 @@ impl Framebuffer {
         //     device.create_framebuffer(&framebuffer_info, None).unwrap()
         // });
 
-        let framebuffer = unwrap_or_return!("Failed to create renderpass", unsafe {
-            device.create_framebuffer(&framebuffer_info, None)
-        });
+        let framebuffer = unsafe {
+            device.create_framebuffer(&framebuffer_info, None)?
+        };
 
         Ok(Framebuffer {
             device: device.clone(),

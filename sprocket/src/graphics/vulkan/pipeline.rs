@@ -3,9 +3,10 @@ use super::RenderPass;
 use crate::graphics::Extent2D;
 use ash::version::DeviceV1_0;
 use ash::vk;
-use std::borrow::Cow;
+use ex::fs;
 use std::ffi::CStr;
-use std::fs;
+
+use super::{Error, Result};
 
 pub struct PipelineSpec {
     pub vertex_shader: String,
@@ -25,7 +26,7 @@ impl Pipeline {
         spec: PipelineSpec,
         extent: Extent2D,
         renderpass: &RenderPass,
-    ) -> Result<Pipeline, Cow<'static, str>> {
+    ) -> Result<Self> {
         let shader_entry_point = unsafe { CStr::from_ptr("main\0".as_ptr() as _) };
 
         // Shader stages
@@ -142,12 +143,8 @@ impl Pipeline {
             .set_layouts(&[])
             .push_constant_ranges(&[]);
 
-        let pipeline_layout = unsafe {
-            unwrap_or_return!(
-                "Failed to create pipeline layout",
-                device.create_pipeline_layout(&pipeline_layout_info, None)
-            )
-        };
+        let pipeline_layout =
+            unsafe { device.create_pipeline_layout(&pipeline_layout_info, None)? };
 
         let pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
             .stages(&shader_stages)
@@ -164,11 +161,10 @@ impl Pipeline {
             .base_pipeline_index(-1)
             .build();
 
-        let pipeline = match unsafe {
-            device.create_graphics_pipelines(vk::PipelineCache::null(), &[pipeline_info], None)
-        } {
-            Ok(pipelines) => pipelines[0],
-            Err(e) => return errfmt!("Failed to create graphics pipeline {:?}", e),
+        let pipeline = unsafe {
+            device
+                .create_graphics_pipelines(vk::PipelineCache::null(), &[pipeline_info], None)
+                .map_err(|e| Error::VulkanError(e.1))?[0]
         };
 
         // Destroy shader modules
@@ -198,20 +194,19 @@ impl Drop for Pipeline {
     }
 }
 
-fn create_shader_module(
-    device: &ash::Device,
-    filename: &str,
-) -> Result<vk::ShaderModule, Cow<'static, str>> {
-    let mut file = unwrap_or_return!("Failed to open file", fs::File::open(filename));
+fn create_shader_module(device: &ash::Device, filename: &str) -> Result<vk::ShaderModule> {
+    let mut file = fs::File::open(filename)?;
 
     let code = match ash::util::read_spv(&mut file) {
         Ok(code) => code,
-        Err(e) => return errfmt!("Failed to read file {}, '{}'", filename, e),
+        Err(e) => return Err(Error::SPVReadError(e, filename.to_owned())),
     };
 
     let create_info = vk::ShaderModuleCreateInfo::builder().code(&code);
 
-    unwrap_and_return!("Failed to create shader module", unsafe {
-        device.create_shader_module(&create_info, None)
-    })
+    unsafe {
+        device
+            .create_shader_module(&create_info, None)
+            .map_err(|e| e.into())
+    }
 }

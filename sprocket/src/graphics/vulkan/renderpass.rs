@@ -1,6 +1,7 @@
 use ash::version::DeviceV1_0;
 use ash::vk;
-use std::borrow::Cow;
+
+use super::Result;
 
 pub struct RenderPass {
     device: ash::Device,
@@ -8,10 +9,7 @@ pub struct RenderPass {
 }
 
 impl RenderPass {
-    pub fn new(
-        device: &ash::Device,
-        color_format: vk::Format,
-    ) -> Result<RenderPass, Cow<'static, str>> {
+    pub fn new(device: &ash::Device, color_format: vk::Format) -> Result<RenderPass> {
         let color_attachment = vk::AttachmentDescription::builder()
             .format(color_format)
             .samples(vk::SampleCountFlags::TYPE_1)
@@ -50,9 +48,7 @@ impl RenderPass {
             .subpasses(subpasses)
             .dependencies(&dependencies);
 
-        let renderpass = unwrap_or_return!("Failed to create renderpass", unsafe {
-            device.create_render_pass(&renderpass_info, None)
-        });
+        let renderpass = unsafe { device.create_render_pass(&renderpass_info, None)? };
 
         Ok(RenderPass {
             device: device.clone(),

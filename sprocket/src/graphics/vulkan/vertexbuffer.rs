@@ -3,7 +3,8 @@ use super::CommandPool;
 use crate::math::*;
 use ash::version::DeviceV1_0;
 use ash::vk;
-use std::borrow::Cow;
+
+use super::{Result};
 
 pub struct Vertex {
     position: Vec2,
@@ -63,34 +64,30 @@ impl VertexBuffer {
         physical_device: vk::PhysicalDevice,
         commandpool: &CommandPool,
         vertices: &[Vertex],
-    ) -> Result<VertexBuffer, Cow<'static, str>> {
+    ) -> Result<VertexBuffer> {
         let buffer_size = match vertices.len() {
             0 => 1024,
             n => (n * std::mem::size_of_val(&vertices[0])) as u64,
         };
 
-        let (staging_buffer, staging_memory) = unwrap_or_return!(
-            "Failed to create staging buffer or memory",
-            buffer::create(
-                instance,
-                device,
-                physical_device,
-                buffer_size,
-                vk::BufferUsageFlags::TRANSFER_SRC,
-                vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
-            )
-        );
+        let (staging_buffer, staging_memory) = buffer::create(
+            instance,
+            device,
+            physical_device,
+            buffer_size,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+        )?;
+
         // Copy the data into the buffer
         unsafe {
-            let data = unwrap_or_return!(
-                "Failed to map vertex buffer memory",
-                device.map_memory(
-                    staging_memory,
-                    0,
-                    buffer_size,
-                    vk::MemoryMapFlags::default(),
-                )
-            );
+            let data = device.map_memory(
+                staging_memory,
+                0,
+                buffer_size,
+                vk::MemoryMapFlags::default(),
+            )?;
+
             std::ptr::copy_nonoverlapping(
                 vertices.as_ptr() as *const std::ffi::c_void,
                 data,
@@ -99,17 +96,14 @@ impl VertexBuffer {
             device.unmap_memory(staging_memory);
         };
 
-        let (buffer, memory) = unwrap_or_return!(
-            "Failed to create buffer or memory",
-            buffer::create(
-                instance,
-                device,
-                physical_device,
-                buffer_size,
-                vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
-                vk::MemoryPropertyFlags::DEVICE_LOCAL
-            )
-        );
+        let (buffer, memory) = buffer::create(
+            instance,
+            device,
+            physical_device,
+            buffer_size,
+            vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
+            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+        )?;
 
         buffer::copy(
             device,

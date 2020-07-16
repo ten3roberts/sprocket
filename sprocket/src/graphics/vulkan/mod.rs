@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 use crate::graphics::glfw;
 use crate::*;
-use std::borrow::Cow;
 use std::collections::HashSet;
 use std::ffi::{c_void, CStr, CString};
 use std::ptr;
@@ -34,6 +33,8 @@ pub use vertexbuffer::Vertex;
 pub use vertexbuffer::VertexBuffer;
 
 mod buffer;
+
+pub use super::{Error, Result};
 
 pub struct VulkanContext {
     entry: ash::Entry,
@@ -95,9 +96,12 @@ impl QueueFamilies {
     }
 }
 
-pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
+pub fn init(window: &Window) -> Result<VulkanContext> {
     unsafe {
-        let entry = unwrap_or_return!("Failed to create vulkan entry", Entry::new());
+        let entry = match Entry::new() {
+            Ok(entry) => entry,
+            Err(_) => return Err(Error::UnsupportedAPI(super::Api::Vulkan)),
+        };
 
         let validation_layers = ["VK_LAYER_KHRONOS_validation"];
         let device_extensions = ["VK_KHR_swapchain"];
@@ -146,10 +150,7 @@ pub fn init(window: &Window) -> Result<VulkanContext, Cow<'static, str>> {
     //
 }
 
-unsafe fn create_instance(
-    entry: &ash::Entry,
-    layers: &[&str],
-) -> Result<ash::Instance, Cow<'static, str>> {
+unsafe fn create_instance(entry: &ash::Entry, layers: &[&str]) -> Result<ash::Instance> {
     let app_name = CString::new("Sprocket").unwrap();
     let app_info = vk::ApplicationInfo::builder()
         .application_name(&app_name)
@@ -179,20 +180,13 @@ unsafe fn create_instance(
         .application_info(&app_info)
         .enabled_layer_names(&layers)
         .enabled_extension_names(&extensions);
-    unwrap_and_return!(
-        "Failed to create instance",
-        entry.create_instance(&create_info, None)
-    )
+    entry
+        .create_instance(&create_info, None)
+        .map_err(|e| Error::InstanceError(e))
 }
 
-fn check_validation_layer_support(
-    entry: &ash::Entry,
-    layers: &[&str],
-) -> Result<(), Cow<'static, str>> {
-    let available_layers = unwrap_or_return!(
-        "Could not enumerate supported layers",
-        entry.enumerate_instance_layer_properties()
-    );
+fn check_validation_layer_support(entry: &ash::Entry, layers: &[&str]) -> Result<()> {
+    let available_layers = entry.enumerate_instance_layer_properties()?;
 
     let available_layers: Vec<&CStr> = available_layers
         .iter()
@@ -209,7 +203,7 @@ fn check_validation_layer_support(
             }
         }
         if !found {
-            return errfmt!("Could not find validation layer {}", layer);
+            return Err(Error::LayerMissing((*layer).to_owned()));
         }
     }
 
@@ -218,7 +212,7 @@ fn check_validation_layer_support(
 
 fn create_debug_messenger(
     debug_utils_loader: &ash::extensions::ext::DebugUtils,
-) -> Result<vk::DebugUtilsMessengerEXT, Cow<'static, str>> {
+) -> Result<vk::DebugUtilsMessengerEXT> {
     let create_info = vk::DebugUtilsMessengerCreateInfoEXT {
         s_type: vk::StructureType::DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
         message_severity: vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE
@@ -234,17 +228,13 @@ fn create_debug_messenger(
     };
 
     unsafe {
-        unwrap_and_return!(
-            "Failed to create debug utils messenger",
-            debug_utils_loader.create_debug_utils_messenger(&create_info, None)
-        )
+        debug_utils_loader
+            .create_debug_utils_messenger(&create_info, None)
+            .map_err(|e| e.into())
     }
 }
 
-unsafe fn create_surface(
-    instance: &ash::Instance,
-    window: &Window,
-) -> Result<vk::SurfaceKHR, Cow<'static, str>> {
+unsafe fn create_surface(instance: &ash::Instance, window: &Window) -> Result<vk::SurfaceKHR> {
     let raw_window = window.get_raw();
     let mut surface_handle = 0;
     let instance = instance.handle();
@@ -256,8 +246,8 @@ unsafe fn create_surface(
         &mut surface_handle,
     ) {
         vk::Result::SUCCESS => {}
-        _ => return errfmt!("Failed to create window surface"),
-    }
+        e => return Err(e.into()),
+    };
 
     Ok(vk::SurfaceKHR::from_raw(surface_handle))
 }
@@ -348,7 +338,7 @@ unsafe fn find_physical_device(
     surface_loader: &Surface,
     surface: &vk::SurfaceKHR,
     device_extensions: &[&str],
-) -> Result<(vk::PhysicalDevice, QueueFamilies), Cow<'static, str>> {
+) -> Result<(vk::PhysicalDevice, QueueFamilies)> {
     let devices = instance.enumerate_physical_devices().unwrap_or_default();
 
     let best_device = match devices
@@ -360,7 +350,7 @@ unsafe fn find_physical_device(
         .max_by(|(_, prev_score), (_, score)| score.cmp(prev_score))
     {
         Some(device) => device,
-        None => return Err("Unable to find suitable GPU".into()),
+        None => return Err(Error::UnsupportedGPU(super::Api::Vulkan)),
     };
 
     let device_properties = instance.get_physical_device_properties(*best_device.0);
@@ -380,7 +370,7 @@ unsafe fn create_device(
     pdevice: vk::PhysicalDevice,
     queue_families: &QueueFamilies,
     device_extensions: &[&str],
-) -> Result<ash::Device, Cow<'static, str>> {
+) -> Result<ash::Device> {
     let priorities = [1.0];
 
     let mut queue_infos = Vec::new();
@@ -412,24 +402,23 @@ unsafe fn create_device(
         .enabled_features(&features)
         .enabled_extension_names(&device_extensions);
 
-    unwrap_and_return!(
-        "Failed to create logical device",
-        instance.create_device(pdevice, &device_create_info, None)
-    )
+    instance
+        .create_device(pdevice, &device_create_info, None)
+        .map_err(|e| e.into())
 }
 
-fn create_semaphore(device: &ash::Device) -> Result<vk::Semaphore, Cow<'static, str>> {
+fn create_semaphore(device: &ash::Device) -> Result<vk::Semaphore> {
     let semaphore_info = vk::SemaphoreCreateInfo::builder().build();
-    unwrap_and_return!("Failed to create semaphore", unsafe {
-        device.create_semaphore(&semaphore_info, None)
-    })
+    unsafe {
+        device
+            .create_semaphore(&semaphore_info, None)
+            .map_err(|e| e.into())
+    }
 }
 
-fn create_fence(device: &ash::Device) -> Result<vk::Fence, Cow<'static, str>> {
+fn create_fence(device: &ash::Device) -> Result<vk::Fence> {
     let fence_info = vk::FenceCreateInfo::builder().flags(vk::FenceCreateFlags::SIGNALED);
-    unwrap_and_return!("Failed to create fence", unsafe {
-        device.create_fence(&fence_info, None)
-    })
+    unsafe { device.create_fence(&fence_info, None).map_err(|e| e.into()) }
 }
 
 fn wait_for_fences(device: &ash::Device, fences: &[vk::Fence], wait_all: bool) {

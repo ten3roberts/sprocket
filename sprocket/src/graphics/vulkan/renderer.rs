@@ -1,7 +1,6 @@
 use super::VulkanContext;
 use super::*;
 use crate::graphics::vulkan;
-use std::borrow::Cow;
 use std::sync::Arc;
 
 const MAX_FRAMES_IN_FLIGHT: usize = 2;
@@ -27,10 +26,7 @@ struct Data {
 }
 
 impl Renderer {
-    pub fn new(
-        context: Arc<VulkanContext>,
-        window: &Window,
-    ) -> Result<Renderer, Cow<'static, str>> {
+    pub fn new(context: Arc<VulkanContext>, window: &Window) -> Result<Renderer> {
         let mut image_available_semaphores = Vec::new();
         let mut render_finished_semaphores = Vec::new();
         let mut in_flight_fences = Vec::new();
@@ -71,7 +67,7 @@ impl Renderer {
             .acquire_next_image(&self.image_available_semaphores[self.current_frame])
         {
             Ok(v) => v,
-            Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+            Err(Error::VulkanError(vk::Result::ERROR_OUT_OF_DATE_KHR)) => {
                 self.recreate(window);
                 return;
             }
@@ -122,7 +118,7 @@ impl Renderer {
             &signal_semaphores,
         ) {
             Ok(v) => v,
-            Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+            Err(Error::VulkanError(vk::Result::ERROR_OUT_OF_DATE_KHR)) => {
                 self.recreate(window);
                 return;
             }
@@ -155,22 +151,16 @@ impl Renderer {
         );
     }
 
-    fn create_data(
-        context: &Arc<VulkanContext>,
-        window: &Window,
-    ) -> Result<Data, Cow<'static, str>> {
-        let swapchain = unwrap_or_return!(
-            "Failed to create swapchain",
-            Swapchain::new(
-                &context.instance,
-                &context.physical_device,
-                &context.device,
-                &context.surface_loader,
-                &context.surface,
-                &context.queue_families,
-                window.extent()
-            )
-        );
+    fn create_data(context: &Arc<VulkanContext>, window: &Window) -> Result<Data> {
+        let swapchain = Swapchain::new(
+            &context.instance,
+            &context.physical_device,
+            &context.device,
+            &context.surface_loader,
+            &context.surface,
+            &context.queue_families,
+            window.extent(),
+        )?;
 
         let renderpass = RenderPass::new(&context.device, swapchain.format())?;
 

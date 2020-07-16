@@ -1,10 +1,13 @@
 mod glfw;
 pub use log::{debug, error, info, trace, warn};
-pub mod vulkan;
-pub mod window;
-use std::borrow::Cow;
 use std::sync::Arc;
 use window::Window;
+
+pub mod error;
+pub mod vulkan;
+pub mod window;
+
+pub use error::{Error, Result};
 
 const SWAPCHAIN_IMAGE_COUNT: u32 = 3;
 
@@ -13,6 +16,7 @@ pub enum GraphicsContext {
     OpenGL,
 }
 
+#[derive(Debug)]
 pub enum Api {
     Vulkan,
     // Opengl is not implemented yet
@@ -20,15 +24,14 @@ pub enum Api {
 }
 
 /// Initializes the graphics api and returns a context
-pub fn init(api: Api, window: &Window) -> Result<GraphicsContext, Cow<'static, str>> {
+pub fn init(api: Api, window: &Window) -> Result<GraphicsContext> {
     match api {
         Api::Vulkan => match vulkan::init(window) {
             Ok(context) => Ok(GraphicsContext::Vulkan(Arc::new(context))),
-            Err(msg) => Err(msg),
+            Err(f) => Err(f),
         },
         Api::OpenGL => {
-            error!("OpenGL graphics is not implemented yet");
-            Err("Invalid Graphics API".into())
+            Err(Error::UnsupportedAPI(api))
         }
     }
 }

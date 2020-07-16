@@ -15,3 +15,6 @@ num-derive = "0.2"
 
 # Vulkan wrapper
 ash = "0.31.0"
+
+# Better io errors
+ex = "0.1.3"

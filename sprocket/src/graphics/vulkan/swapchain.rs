@@ -2,8 +2,10 @@ use super::texture::Texture;
 use crate::graphics::Extent2D;
 use crate::*;
 use ash::vk;
-use std::borrow::Cow;
 use std::cmp::{max, min};
+
+use super::Result;
+
 pub struct Swapchain {
     swapchain: vk::SwapchainKHR,
     swapchain_loader: ash::extensions::khr::Swapchain,
@@ -21,12 +23,10 @@ impl Swapchain {
         surface: &vk::SurfaceKHR,
         queue_families: &graphics::vulkan::QueueFamilies,
         extent: Extent2D,
-    ) -> Result<Swapchain, Cow<'static, str>> {
+    ) -> Result<Swapchain> {
         unsafe {
-            let (capabilities, formats, present_modes) = unwrap_or_return!(
-                "Failed to query swapchain support",
-                Self::query_support(physical_device, surface_loader, surface)
-            );
+            let (capabilities, formats, present_modes) =
+                Self::query_support(physical_device, surface_loader, surface)?;
 
             let format = Self::pick_format(formats);
             let present_mode = Self::pick_present_mode(present_modes);
@@ -66,16 +66,11 @@ impl Swapchain {
                 create_info.queue_family_index_count = 0;
             }
 
-            let swapchain = unwrap_or_return!(
-                "Failed to create swapchain",
-                swapchain_loader.create_swapchain(&create_info, None)
-            );
+            let swapchain = swapchain_loader.create_swapchain(&create_info, None)?;
 
             // Create textures from the images in swapchain
-            let images = unwrap_or_return!(
-                "Failed to get swapchain images",
-                swapchain_loader.get_swapchain_images(swapchain)
-            );
+            let images = swapchain_loader.get_swapchain_images(swapchain)?;
+
             let images = images
                 .into_iter()
                 .map(|image| Texture::new_from_image(device, extent.into(), image, format.format))
@@ -147,14 +142,11 @@ impl Swapchain {
     }
 
     /// Returns the index to the next available image in the swapchain
-    pub fn acquire_next_image(&self, semaphore: &vk::Semaphore) -> Result<(u32, bool), vk::Result> {
+    pub fn acquire_next_image(&self, semaphore: &vk::Semaphore) -> Result<(u32, bool)> {
         unsafe {
-            self.swapchain_loader.acquire_next_image(
-                self.swapchain,
-                std::u64::MAX,
-                *semaphore,
-                vk::Fence::null(),
-            )
+            self.swapchain_loader
+                .acquire_next_image(self.swapchain, std::u64::MAX, *semaphore, vk::Fence::null())
+                .map_err(|e| e.into())
         }
     }
 
@@ -164,14 +156,18 @@ impl Swapchain {
         image_index: u32,
         queue: vk::Queue,
         wait_semaphores: &[vk::Semaphore],
-    ) -> Result<bool, vk::Result> {
+    ) -> Result<bool> {
         let present_info = vk::PresentInfoKHR::builder()
             .wait_semaphores(wait_semaphores)
             .swapchains(&[self.swapchain])
             .image_indices(&[image_index])
             .build();
 
-        unsafe { self.swapchain_loader.queue_present(queue, &present_info) }
+        unsafe {
+            self.swapchain_loader
+                .queue_present(queue, &present_info)
+                .map_err(|e| e.into())
+        }
     }
 
     pub fn vk(&self) -> vk::SwapchainKHR {
@@ -186,28 +182,19 @@ impl Swapchain {
         physical_device: &vk::PhysicalDevice,
         surface_loader: &ash::extensions::khr::Surface,
         surface: &vk::SurfaceKHR,
-    ) -> Result<
-        (
-            vk::SurfaceCapabilitiesKHR,
-            Vec<vk::SurfaceFormatKHR>,
-            Vec<vk::PresentModeKHR>,
-        ),
-        Cow<'static, str>,
-    > {
-        let capabilities = unwrap_or_return!(
-            "Unable to get physical device surface capabilities",
-            surface_loader.get_physical_device_surface_capabilities(*physical_device, *surface)
-        );
+    ) -> Result<(
+        vk::SurfaceCapabilitiesKHR,
+        Vec<vk::SurfaceFormatKHR>,
+        Vec<vk::PresentModeKHR>,
+    )> {
+        let capabilities =
+            surface_loader.get_physical_device_surface_capabilities(*physical_device, *surface)?;
 
-        let formats = unwrap_or_return!(
-            "Failed to get surface formats for swapchain",
-            surface_loader.get_physical_device_surface_formats(*physical_device, *surface)
-        );
+        let formats =
+            surface_loader.get_physical_device_surface_formats(*physical_device, *surface)?;
 
-        let present_modes = unwrap_or_return!(
-            "Failed to get present modes from surface",
-            surface_loader.get_physical_device_surface_present_modes(*physical_device, *surface)
-        );
+        let present_modes =
+            surface_loader.get_physical_device_surface_present_modes(*physical_device, *surface)?;
 
         Ok((capabilities, formats, present_modes))
     }

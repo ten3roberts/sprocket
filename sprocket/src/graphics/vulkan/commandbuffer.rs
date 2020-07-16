@@ -4,7 +4,8 @@ use super::RenderPass;
 use super::VertexBuffer;
 use ash::version::DeviceV1_0;
 use ash::vk;
-use std::borrow::Cow;
+
+use super::{Error, Result};
 
 pub struct CommandPool {
     device: ash::Device,
@@ -22,7 +23,7 @@ impl CommandPool {
         queue_family: u32,
         transient: bool,
         partial_reset: bool,
-    ) -> Result<CommandPool, Cow<'static, str>> {
+    ) -> Result<CommandPool> {
         let mut flags = vk::CommandPoolCreateFlags::default();
         if transient {
             flags |= vk::CommandPoolCreateFlags::TRANSIENT;
@@ -36,9 +37,7 @@ impl CommandPool {
             .queue_family_index(queue_family)
             .flags(flags)
             .build();
-        let pool = unwrap_or_return!("Failed to create command pool", unsafe {
-            device.create_command_pool(&pool_info, None)
-        });
+        let pool = unsafe { device.create_command_pool(&pool_info, None)? };
 
         Ok(CommandPool {
             device: device.clone(),
@@ -66,23 +65,13 @@ impl CommandBuffer {
         device: &ash::Device,
         commandpool: &CommandPool,
         count: usize,
-    ) -> Result<Vec<CommandBuffer>, Cow<'static, str>> {
+    ) -> Result<Vec<CommandBuffer>> {
         let alloc_info = vk::CommandBufferAllocateInfo::builder()
             .command_pool(commandpool.pool)
             .level(vk::CommandBufferLevel::PRIMARY)
             .command_buffer_count(count as u32)
             .build();
-        let commandbuffers = unwrap_or_return!("Failed to create commandbuffer", unsafe {
-            device.allocate_command_buffers(&alloc_info)
-        });
-
-        if commandbuffers.len() != count {
-            return errfmt!(
-                "Commandbuffer count does not match requested count. Requested {}, acquired {}",
-                count,
-                commandbuffers.len()
-            );
-        }
+        let commandbuffers = unsafe { device.allocate_command_buffers(&alloc_info)? };
 
         Ok(commandbuffers
             .into_iter()
@@ -94,30 +83,25 @@ impl CommandBuffer {
             .collect())
     }
 
-    pub fn begin(
-        &mut self,
-        begin_info: vk::CommandBufferUsageFlags,
-    ) -> Result<(), Cow<'static, str>> {
+    pub fn begin(&mut self, begin_info: vk::CommandBufferUsageFlags) -> Result<()> {
         let begin_info = vk::CommandBufferBeginInfo::builder()
             .flags(begin_info)
             .build();
-        unwrap_or_return!("Failed to begin recording of command buffer", unsafe {
+        unsafe {
             self.device
-                .begin_command_buffer(self.commandbuffer, &begin_info)
-        });
+                .begin_command_buffer(self.commandbuffer, &begin_info)?
+        };
 
         self.recording = true;
         Ok(())
     }
 
-    pub fn end(&mut self) -> Result<(), Cow<'static, str>> {
+    pub fn end(&mut self) -> Result<()> {
         if !self.recording {
-            return Err("Cannot end commandbuffer that's not recording".into());
+            return Err(Error::NotRecording);
         }
 
-        unwrap_or_return!("Failed to end recording of command buffer", unsafe {
-            self.device.end_command_buffer(self.commandbuffer)
-        });
+        unsafe { self.device.end_command_buffer(self.commandbuffer)? };
 
         self.recording = false;
 
@@ -132,7 +116,7 @@ impl CommandBuffer {
         wait_stages: &[vk::PipelineStageFlags],
         signal_semaphores: &[vk::Semaphore],
         fence: vk::Fence,
-    ) -> Result<(), Cow<'static, str>> {
+    ) -> Result<()> {
         let commandbuffers: Vec<vk::CommandBuffer> = commandbuffers
             .iter()
             .map(|commandbuffer| commandbuffer.commandbuffer)
@@ -144,9 +128,11 @@ impl CommandBuffer {
             .signal_semaphores(signal_semaphores)
             .build();
 
-        unwrap_and_return!("Failed to submit command buffers", unsafe {
-            device.queue_submit(queue, &[submit_info], fence)
-        })
+        unsafe {
+            device
+                .queue_submit(queue, &[submit_info], fence)
+                .map_err(|e| e.into())
+        }
     }
 
     pub fn begin_renderpass(

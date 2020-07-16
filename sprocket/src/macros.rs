@@ -1,3 +1,5 @@
+#![allow(unused_macros)]
+
 #[macro_use]
 macro_rules! errfmt {
     ($($arg:tt)*) => ({
