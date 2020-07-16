@@ -1,9 +1,11 @@
 #![allow(dead_code)]
 use crate::graphics::glfw;
 use crate::*;
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::ffi::{c_void, CStr, CString};
 use std::ptr;
+use std::sync::Arc;
 
 use ash::extensions::khr::Surface;
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
@@ -36,6 +38,8 @@ mod buffer;
 
 pub use super::{Error, Result};
 
+pub type VkAllocator = Arc<RefCell<vk_mem::Allocator>>;
+
 pub struct VulkanContext {
     entry: ash::Entry,
     instance: ash::Instance,
@@ -48,6 +52,7 @@ pub struct VulkanContext {
     queue_families: QueueFamilies,
     graphics_queue: vk::Queue,
     present_queue: vk::Queue,
+    allocator: VkAllocator,
 }
 
 pub struct QueueFamilies {
@@ -130,6 +135,18 @@ pub fn init(window: &Window) -> Result<VulkanContext> {
         let graphics_queue = device.get_device_queue(queue_families.graphics.unwrap(), 0);
         let present_queue = device.get_device_queue(queue_families.present.unwrap(), 0);
 
+        let allocator_info = vk_mem::AllocatorCreateInfo {
+            device: device.clone(),
+            instance: instance.clone(),
+            physical_device,
+            preferred_large_heap_block_size: 0,
+            frame_in_use_count: 1,
+            flags: vk_mem::AllocatorCreateFlags::default(),
+            heap_size_limits: None,
+        };
+
+        let allocator = Arc::new(RefCell::new(vk_mem::Allocator::new(&allocator_info)?));
+
         Ok(VulkanContext {
             entry,
             instance,
@@ -142,6 +159,7 @@ pub fn init(window: &Window) -> Result<VulkanContext> {
             queue_families,
             graphics_queue,
             present_queue,
+            allocator,
         })
     }
 
@@ -441,6 +459,7 @@ impl Drop for VulkanContext {
     fn drop(&mut self) {
         info!("Dropping vulkan context");
         unsafe {
+            self.allocator.borrow_mut().destroy();
             // Drop data before device
             // This will later migrate out to materials and alike
             self.device.device_wait_idle().unwrap();

@@ -8,6 +8,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     IoError(ex::io::Error),
     VulkanError(vk::Result),
+    VMAError(vk_mem::Error),
     GLFWError(glfw::Error),
     InstanceError(ash::InstanceError),
     MissingLayer(String),
@@ -21,6 +22,12 @@ pub enum Error {
 impl From<vk::Result> for Error {
     fn from(error: vk::Result) -> Self {
         Error::VulkanError(error)
+    }
+}
+
+impl From<vk_mem::Error> for Error {
+    fn from(error: vk_mem::Error) -> Self {
+        Error::VMAError(error)
     }
 }
 
@@ -41,6 +48,7 @@ impl std::fmt::Display for Error {
         match self {
             Error::IoError(e) => write!(f, "Io error {:?}", e),
             Error::VulkanError(e) => write!(f, "Vulkan error {:?}", e),
+            Error::VMAError(e) => write!(f, "Vulkan allocation error {:?}", e),
             Error::InstanceError(e) => write!(f, "Instance creation error {:?}", e),
             Error::GLFWError(e) => write!(f, "GLFW error {:?}", e),
             Error::MissingLayer(l) => write!(f, "Cannot locate {} on the system", l),

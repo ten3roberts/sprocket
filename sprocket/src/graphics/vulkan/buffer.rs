@@ -5,42 +5,7 @@ use ash::vk;
 
 use super::{Error, Result};
 
-// Creates a new low level vulkan buffer
-pub fn create(
-    instance: &ash::Instance,
-    device: &ash::Device,
-    physical_device: vk::PhysicalDevice,
-    size: vk::DeviceSize,
-    usage: vk::BufferUsageFlags,
-    properties: vk::MemoryPropertyFlags,
-) -> Result<(vk::Buffer, vk::DeviceMemory)> {
-    let buffer_info = vk::BufferCreateInfo::builder()
-        .size(size)
-        .sharing_mode(vk::SharingMode::EXCLUSIVE)
-        .usage(usage);
-
-    let buffer = unsafe { device.create_buffer(&buffer_info, None) }?;
-
-    let memory_requirements = unsafe { device.get_buffer_memory_requirements(buffer) };
-    let memory_type_index = find_memory_type(
-        instance,
-        physical_device,
-        memory_requirements.memory_type_bits,
-        properties,
-    )?;
-
-    let alloc_info = vk::MemoryAllocateInfo::builder()
-        .allocation_size(memory_requirements.size)
-        .memory_type_index(memory_type_index);
-
-    let memory = unsafe { device.allocate_memory(&alloc_info, None)? };
-
-    unsafe { device.bind_buffer_memory(buffer, memory, 0)? };
-
-    Ok((buffer, memory))
-}
-
-// Copies the contents of one buffer to another
+/// Copies the contents of one buffer to another
 pub fn copy(
     device: &ash::Device,
     queue: vk::Queue,

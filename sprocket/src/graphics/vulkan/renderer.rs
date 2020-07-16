@@ -199,10 +199,9 @@ impl Renderer {
         ];
 
         let vertexbuffer = VertexBuffer::new(
-            &context.instance,
+            &context.allocator,
             &context.device,
             context.graphics_queue,
-            context.physical_device,
             &commandpool,
             &vertices,
         )?;

@@ -1,10 +1,10 @@
 use super::buffer;
 use super::CommandPool;
 use crate::math::*;
-use ash::version::DeviceV1_0;
 use ash::vk;
+use std::sync::Arc;
 
-use super::Result;
+use super::{Result, VkAllocator};
 
 pub struct Vertex {
     position: Vec2,
@@ -45,9 +45,9 @@ impl Vertex {
 }
 
 pub struct VertexBuffer {
-    device: ash::Device,
+    allocator: VkAllocator,
     buffer: vk::Buffer,
-    memory: vk::DeviceMemory,
+    memory: vk_mem::Allocation,
     size: vk::DeviceSize,
 }
 
@@ -58,10 +58,9 @@ impl VertexBuffer {
     /// The buffer is filled with the supplied vertices
     /// If an empty list of vertices is supplied, DEFAULT_SIZE bytes is allocated
     pub fn new(
-        instance: &ash::Instance,
+        allocator: &VkAllocator,
         device: &ash::Device,
         queue: vk::Queue,
-        physical_device: vk::PhysicalDevice,
         commandpool: &CommandPool,
         vertices: &[Vertex],
     ) -> Result<VertexBuffer> {
@@ -70,39 +69,35 @@ impl VertexBuffer {
             n => (n * std::mem::size_of_val(&vertices[0])) as u64,
         };
 
-        let (staging_buffer, staging_memory) = buffer::create(
-            instance,
-            device,
-            physical_device,
-            buffer_size,
-            vk::BufferUsageFlags::TRANSFER_SRC,
-            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+        let (staging_buffer, staging_memory, _) = allocator.borrow().create_buffer(
+            &vk::BufferCreateInfo::builder()
+                .size(buffer_size)
+                .usage(vk::BufferUsageFlags::TRANSFER_SRC)
+                .sharing_mode(vk::SharingMode::EXCLUSIVE)
+                .build(),
+            &vk_mem::AllocationCreateInfo {
+                usage: vk_mem::MemoryUsage::CpuToGpu,
+                ..Default::default()
+            },
         )?;
 
         // Copy the data into the buffer
+        let data = allocator.borrow().map_memory(&staging_memory)?;
         unsafe {
-            let data = device.map_memory(
-                staging_memory,
-                0,
-                buffer_size,
-                vk::MemoryMapFlags::default(),
-            )?;
+            std::ptr::copy_nonoverlapping(vertices.as_ptr() as _, data, buffer_size as usize);
+        }
+        allocator.borrow().unmap_memory(&staging_memory)?;
 
-            std::ptr::copy_nonoverlapping(
-                vertices.as_ptr() as *const std::ffi::c_void,
-                data,
-                buffer_size as usize,
-            );
-            device.unmap_memory(staging_memory);
-        };
-
-        let (buffer, memory) = buffer::create(
-            instance,
-            device,
-            physical_device,
-            buffer_size,
-            vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
-            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+        let (buffer, memory, _) = allocator.borrow().create_buffer(
+            &vk::BufferCreateInfo::builder()
+                .size(buffer_size)
+                .usage(vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER)
+                .sharing_mode(vk::SharingMode::EXCLUSIVE)
+                .build(),
+            &vk_mem::AllocationCreateInfo {
+                usage: vk_mem::MemoryUsage::GpuOnly,
+                ..Default::default()
+            },
         )?;
 
         buffer::copy(
@@ -114,10 +109,12 @@ impl VertexBuffer {
             buffer_size,
         )?;
 
-        buffer::destroy(device, staging_buffer, staging_memory);
+        allocator
+            .borrow()
+            .destroy_buffer(staging_buffer, &staging_memory)?;
 
         Ok(VertexBuffer {
-            device: device.clone(),
+            allocator: Arc::clone(allocator),
             buffer,
             memory,
             size: buffer_size,
@@ -131,6 +128,9 @@ impl VertexBuffer {
 
 impl Drop for VertexBuffer {
     fn drop(&mut self) {
-        buffer::destroy(&self.device, self.buffer, self.memory);
+        self.allocator
+            .borrow()
+            .destroy_buffer(self.buffer, &self.memory)
+            .expect("Failed to free vulkan memory");
     }
 }
