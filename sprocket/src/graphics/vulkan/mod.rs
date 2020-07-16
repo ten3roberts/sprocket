@@ -34,6 +34,9 @@ pub mod vertexbuffer;
 pub use vertexbuffer::Vertex;
 pub use vertexbuffer::VertexBuffer;
 
+pub mod indexbuffer;
+pub use indexbuffer::IndexBuffer;
+
 mod buffer;
 
 pub use super::{Error, Result};

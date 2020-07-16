@@ -1,7 +1,4 @@
-use super::Framebuffer;
-use super::Pipeline;
-use super::RenderPass;
-use super::VertexBuffer;
+use super::{Framebuffer, IndexBuffer, Pipeline, RenderPass, VertexBuffer};
 use ash::version::DeviceV1_0;
 use ash::vk;
 
@@ -191,10 +188,28 @@ impl CommandBuffer {
         }
     }
 
+    pub fn bind_indexbuffer(&self, indexbuffer: &IndexBuffer) {
+        unsafe {
+            self.device.cmd_bind_index_buffer(
+                self.commandbuffer,
+                indexbuffer.buffer(),
+                0,
+                indexbuffer.index_type(),
+            )
+        }
+    }
+
     pub fn draw(&self) {
         unsafe {
             self.device.cmd_draw(self.commandbuffer, 3, 1, 0, 0);
         };
+    }
+
+    pub fn draw_indexed(&self, index_count: u32) {
+        unsafe {
+            self.device
+                .cmd_draw_indexed(self.commandbuffer, index_count, 1, 0, 0, 0)
+        }
     }
 
     pub fn vk(&self) -> vk::CommandBuffer {

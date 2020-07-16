@@ -23,6 +23,7 @@ struct Data {
     pipeline: Pipeline,
     framebuffers: Vec<Framebuffer>,
     vertexbuffer: VertexBuffer,
+    indexbuffer: IndexBuffer,
 }
 
 impl Renderer {
@@ -193,10 +194,13 @@ impl Renderer {
             CommandBuffer::new_primary(&context.device, &commandpool, swapchain.image_count())?;
 
         let vertices = [
-            Vertex::new(Vec2::new(0.0, -0.5), Vec3::right()),
+            Vertex::new(Vec2::new(-0.5, -0.5), Vec3::right()),
+            Vertex::new(Vec2::new(0.5, -0.5), Vec3::right()),
             Vertex::new(Vec2::new(0.5, 0.5), Vec3::up()),
             Vertex::new(Vec2::new(-0.5, 0.5), Vec3::forward()),
         ];
+
+        let indices = [0, 1, 2, 2, 3, 0];
 
         let vertexbuffer = VertexBuffer::new(
             &context.allocator,
@@ -204,6 +208,14 @@ impl Renderer {
             context.graphics_queue,
             &commandpool,
             &vertices,
+        )?;
+
+        let indexbuffer = IndexBuffer::new(
+            &context.allocator,
+            &context.device,
+            context.graphics_queue,
+            &commandpool,
+            &indices,
         )?;
 
         // Prerecord commandbuffers
@@ -216,7 +228,8 @@ impl Renderer {
             );
             commandbuffer.bind_pipeline(&pipeline);
             commandbuffer.bind_vertexbuffer(&vertexbuffer);
-            commandbuffer.draw();
+            commandbuffer.bind_indexbuffer(&indexbuffer);
+            commandbuffer.draw_indexed(indexbuffer.count());
             commandbuffer.end_renderpass();
             commandbuffer.end()?;
         }
@@ -229,6 +242,7 @@ impl Renderer {
             pipeline,
             framebuffers,
             vertexbuffer,
+            indexbuffer,
         })
     }
 }
