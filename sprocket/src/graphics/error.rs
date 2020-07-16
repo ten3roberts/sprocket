@@ -44,9 +44,13 @@ impl std::fmt::Display for Error {
             Error::GLFWError(e) => write!(f, "GLFW error {:?}", e),
             Error::LayerMissing(l) => write!(f, "Cannot locate {} on the system", l),
             Error::UnsupportedAPI(a) => write!(f, "{:?} is not supported", a),
-            Error::UnsupportedGPU(a) => write!(f, "Unable to find a GPU supporting {:?}", a),
-            Error::SPVReadError(e, path) => write!(f, "Failed to read SPV from file {:?}'{:?}'", path, e),
-            Error::NotRecording =>  write!(f, "Command buffer is not in recording state")
+            Error::UnsupportedGPU(a) => {
+                write!(f, "Unable to find a suitable GPU supporting {:?}", a)
+            }
+            Error::SPVReadError(e, path) => {
+                write!(f, "Failed to read SPV from file {:?}'{:?}'", path, e)
+            }
+            Error::NotRecording => write!(f, "Command buffer is not in recording state"),
         }
 
         // write!(f, "({}, {}, {}, {})", self.x, self.y, self.z, self.w)
