@@ -1,9 +1,9 @@
 use super::texture::Texture;
 use super::RenderPass;
+use super::Result;
 use crate::graphics::Extent2D;
 use ash::version::DeviceV1_0;
 use ash::vk;
-use super::{Result};
 
 pub struct Framebuffer {
     device: ash::Device,
@@ -31,15 +31,7 @@ impl Framebuffer {
             .layers(1)
             .build();
 
-        // let framebuffer = unsafe { device.create_framebuffer(&framebuffer_info, None).unwrap() };
-
-        // let framebuffer = unwrap_or_return!("Failed to create frambuffer", unsafe {
-        //     device.create_framebuffer(&framebuffer_info, None).unwrap()
-        // });
-
-        let framebuffer = unsafe {
-            device.create_framebuffer(&framebuffer_info, None)?
-        };
+        let framebuffer = unsafe { device.create_framebuffer(&framebuffer_info, None)? };
 
         Ok(Framebuffer {
             device: device.clone(),
