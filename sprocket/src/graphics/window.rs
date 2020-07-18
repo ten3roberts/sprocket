@@ -148,6 +148,10 @@ impl Window {
         }
     }
 
+    pub fn aspect(&self) -> f32 {
+        unsafe { (*self.data).width as f32 / (*self.data).height as f32 }
+    }
+
     /// # Safety
     /// Returns the underlying GLFW window
     /// Will fail if glfw_terminate is called with alive windows

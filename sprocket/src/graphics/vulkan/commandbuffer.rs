@@ -1,4 +1,4 @@
-use super::{Framebuffer, IndexBuffer, Pipeline, RenderPass, VertexBuffer};
+use super::{DescriptorSet, Framebuffer, IndexBuffer, Pipeline, RenderPass, VertexBuffer};
 use ash::version::DeviceV1_0;
 use ash::vk;
 
@@ -195,6 +195,20 @@ impl CommandBuffer {
                 indexbuffer.buffer(),
                 0,
                 indexbuffer.index_type(),
+            )
+        }
+    }
+
+    pub fn bind_descriptorsets(&self, pipeline: &Pipeline, descriptor_sets: &[&DescriptorSet]) {
+        unsafe {
+            let sets: Vec<vk::DescriptorSet> = descriptor_sets.iter().map(|set| set.vk()).collect();
+            self.device.cmd_bind_descriptor_sets(
+                self.commandbuffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                pipeline.layout(),
+                0,
+                &sets,
+                &[],
             )
         }
     }

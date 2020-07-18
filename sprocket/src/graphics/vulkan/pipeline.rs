@@ -1,4 +1,5 @@
 use super::vertexbuffer::Vertex;
+use super::DescriptorSetLayout;
 use super::RenderPass;
 use crate::graphics::Extent2D;
 use ash::version::DeviceV1_0;
@@ -26,6 +27,7 @@ impl Pipeline {
         spec: PipelineSpec,
         extent: Extent2D,
         renderpass: &RenderPass,
+        set_layouts: &[&DescriptorSetLayout],
     ) -> Result<Self> {
         let shader_entry_point = unsafe { CStr::from_ptr("main\0".as_ptr() as _) };
 
@@ -139,8 +141,10 @@ impl Pipeline {
         //     vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_states);
 
         // Pipeline layout
+        let set_layouts: Vec<vk::DescriptorSetLayout> =
+            set_layouts.iter().map(|layout| layout.vk()).collect();
         let pipeline_layout_info = vk::PipelineLayoutCreateInfo::builder()
-            .set_layouts(&[])
+            .set_layouts(&set_layouts)
             .push_constant_ranges(&[]);
 
         let pipeline_layout =
@@ -182,6 +186,10 @@ impl Pipeline {
 
     pub fn vk(&self) -> vk::Pipeline {
         self.pipeline
+    }
+
+    pub fn layout(&self) -> vk::PipelineLayout {
+        self.layout
     }
 }
 

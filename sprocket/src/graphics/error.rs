@@ -17,6 +17,8 @@ pub enum Error {
     SPVReadError(std::io::Error, String),
     NotRecording,
     MissingMemoryType(vk::MemoryPropertyFlags),
+    MismatchedBinding(vk::DescriptorType, u32, u32),
+    UnsupportedDescriptorType(vk::DescriptorType),
 }
 
 impl From<vk::Result> for Error {
@@ -63,8 +65,8 @@ impl std::fmt::Display for Error {
             Error::MissingMemoryType(properties) => {
                 write!(f, "Cannot find GPU memory type supporting {:?}", properties)
             }
+            Error::MismatchedBinding(ty, binding_count, supplied_count) => write!(f, "Descriptor set bindings count do not match supplied count for {:?}. Expected {}, supplied {}", ty, binding_count, supplied_count),
+            Error::UnsupportedDescriptorType(ty) => write!(f, "Descriptor type {:?} is not supported", ty),
         }
-
-        // write!(f, "({}, {}, {}, {})", self.x, self.y, self.z, self.w)
     }
 }

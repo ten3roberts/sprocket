@@ -1,6 +1,7 @@
 use super::VulkanContext;
 use super::*;
 use crate::graphics::vulkan;
+use math::Mat4;
 use std::sync::Arc;
 
 const MAX_FRAMES_IN_FLIGHT: usize = 2;
@@ -24,6 +25,10 @@ struct Data {
     framebuffers: Vec<Framebuffer>,
     vertexbuffer: VertexBuffer,
     indexbuffer: IndexBuffer,
+    uniformbuffers: Vec<UniformBuffer>,
+    set_layout: DescriptorSetLayout,
+    descriptor_pool: DescriptorPool,
+    descriptors: Vec<DescriptorSet>,
 }
 
 impl Renderer {
@@ -62,6 +67,8 @@ impl Renderer {
 
         vulkan::wait_for_fences(device, &[self.in_flight_fences[self.current_frame]], true);
 
+        // Update uniform buffer for this frame
+
         let (image_index, suboptimal) = match self
             .data
             .swapchain
@@ -84,6 +91,18 @@ impl Renderer {
         }
 
         std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let ub_data = UniformBufferObject {
+            model: Mat4::translate(Vec3::new(0.0, 0.0, -5.0)),
+            view: Mat4::identity(),
+            // proj: Mat4::ortho(window.aspect(), 1.0, 0.0, 100.0),
+            proj: Mat4::perspective(window.aspect(), 2.0, 2.0, 10.0),
+        };
+
+        iferr!(
+            "Failed to write to uniformbuffer",
+            self.data.uniformbuffers[image_index as usize].write(&ub_data, None, None)
+        );
 
         // Check if a previous frame is using this image (i.e. there is its fence to wait on)
         if self.images_in_flight[image_index as usize] != vk::Fence::null() {
@@ -171,7 +190,55 @@ impl Renderer {
             geometry_shader: "".into(),
         };
 
-        let pipeline = Pipeline::new(&context.device, pipeline_spec, window.extent(), &renderpass)?;
+        let mut uniformbuffers = Vec::new();
+        for _ in 0..swapchain.image_count() {
+            uniformbuffers.push(UniformBuffer::new(
+                &context.allocator,
+                std::mem::size_of::<UniformBufferObject>() as u64,
+            )?);
+        }
+
+        let descriptor_bindings = [vk::DescriptorSetLayoutBinding {
+            binding: 0,
+            descriptor_count: 1,
+            descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+            p_immutable_samplers: std::ptr::null(),
+            stage_flags: vk::ShaderStageFlags::VERTEX,
+        }];
+
+        let set_layout = DescriptorSetLayout::new(&context.device, &descriptor_bindings)?;
+
+        let descriptor_pool = DescriptorPool::new(
+            &context.device,
+            &[vk::DescriptorPoolSize {
+                descriptor_count: swapchain.image_count() as u32,
+                ty: vk::DescriptorType::UNIFORM_BUFFER,
+            }],
+            swapchain.image_count() as u32,
+        )?;
+
+        // Create descriptor set for mvp data
+        let descriptors = DescriptorSet::new(
+            &context.device,
+            &descriptor_pool,
+            &set_layout,
+            swapchain.image_count() as u32,
+        )?;
+
+        DescriptorSet::write(
+            &context.device,
+            &descriptors,
+            &descriptor_bindings,
+            &uniformbuffers,
+        )?;
+
+        let pipeline = Pipeline::new(
+            &context.device,
+            pipeline_spec,
+            window.extent(),
+            &renderpass,
+            &[&set_layout],
+        )?;
 
         let commandpool = CommandPool::new(
             &context.device,
@@ -229,6 +296,7 @@ impl Renderer {
             commandbuffer.bind_pipeline(&pipeline);
             commandbuffer.bind_vertexbuffer(&vertexbuffer);
             commandbuffer.bind_indexbuffer(&indexbuffer);
+            commandbuffer.bind_descriptorsets(&pipeline, &[&descriptors[i]]);
             commandbuffer.draw_indexed(indexbuffer.count());
             commandbuffer.end_renderpass();
             commandbuffer.end()?;
@@ -243,6 +311,10 @@ impl Renderer {
             framebuffers,
             vertexbuffer,
             indexbuffer,
+            uniformbuffers,
+            set_layout,
+            descriptor_pool,
+            descriptors,
         })
     }
 }

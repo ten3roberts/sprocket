@@ -86,6 +86,7 @@ impl IndexBuffer {
         vk::IndexType::UINT32
     }
 
+    /// Returns the number of indices in the buffer
     pub fn count(&self) -> u32 {
         self.count
     }

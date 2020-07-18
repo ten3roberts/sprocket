@@ -127,6 +127,7 @@ impl VertexBuffer {
         self.buffer
     }
 
+    /// Returns the number of vertices in the buffer
     pub fn count(&self) -> u32 {
         self.count
     }

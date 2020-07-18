@@ -37,6 +37,13 @@ pub use vertexbuffer::VertexBuffer;
 pub mod indexbuffer;
 pub use indexbuffer::IndexBuffer;
 
+pub mod uniformbuffer;
+pub use uniformbuffer::UniformBuffer;
+pub use uniformbuffer::UniformBufferObject;
+
+pub mod descriptors;
+pub use descriptors::{DescriptorPool, DescriptorSet, DescriptorSetLayout};
+
 mod buffer;
 
 pub use super::{Error, Result};
