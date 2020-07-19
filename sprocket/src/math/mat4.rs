@@ -88,7 +88,34 @@ impl Mat4 {
         let sina = angle.sin();
 
         Mat4([
-            1.0, 0.0, 0.0, 0.0, 0.0, cosa, -sina, 0.0, 0.0, sina, cosa, 0.0, 0.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 0.0,
+            0.0, cosa, -sina, 0.0, 
+            0.0, sina, cosa, 0.0, 
+            0.0, 0.0, 0.0, 1.0,
+        ])
+    }
+
+    pub fn rotate_z(angle: f32) -> Self {
+        let cosa = angle.cos();
+        let sina = angle.sin();
+
+        Mat4([
+            cosa, -sina, 0.0, 0.0,
+            sina, cosa, 0.0, 0.0, 
+            0.0, 0.0, 0.0, 0.0, 
+            0.0, 0.0, 0.0, 1.0,
+        ])
+    }
+
+    pub fn rotate_y(angle: f32) -> Self {
+        let cosa = angle.cos();
+        let sina = angle.sin();
+
+        Mat4([
+            cosa, 0.0, sina, 0.0,
+            0.0, 1.0, 0.0, 0.0, 
+            -sina, 0.0, cosa, 0.0, 
+            0.0, 0.0, 0.0, 1.0,
         ])
     }
 }

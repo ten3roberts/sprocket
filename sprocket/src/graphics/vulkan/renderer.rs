@@ -14,6 +14,7 @@ pub struct Renderer {
     images_in_flight: Vec<vk::Fence>,
     current_frame: usize,
     data: Data,
+    frame_count: usize,
 }
 
 struct Data {
@@ -59,6 +60,7 @@ impl Renderer {
             images_in_flight,
             current_frame: 0,
             data,
+            frame_count: 0,
         })
     }
 
@@ -90,13 +92,11 @@ impl Renderer {
             return;
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(100));
-
         let ub_data = UniformBufferObject {
-            model: Mat4::translate(Vec3::new(0.0, 0.0, -5.0)),
+            model: Mat4::rotate_z(self.frame_count as f32 / 15.0) * Mat4::rotate_y(self.frame_count as f32 / 150.0) * Mat4::translate(Vec3::new(0.0, (self.frame_count as f32 / 50.0).sin() * 0.5, -3.0)),
             view: Mat4::identity(),
             // proj: Mat4::ortho(window.aspect(), 1.0, 0.0, 100.0),
-            proj: Mat4::perspective(window.aspect(), 2.0, 2.0, 10.0),
+            proj: Mat4::perspective(window.aspect(), 1.0, 0.0, 1000.0),
         };
 
         iferr!(
@@ -154,6 +154,7 @@ impl Renderer {
         }
 
         self.current_frame = (self.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+        self.frame_count += 1;
     }
 
     fn recreate(&mut self, window: &Window) {
