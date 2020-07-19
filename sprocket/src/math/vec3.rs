@@ -330,3 +330,23 @@ impl ops::DivAssign<f32> for Vec3 {
         self.z /= rhs;
     }
 }
+
+impl From<(f32, f32, f32)> for Vec3 {
+    fn from(t: (f32, f32, f32)) -> Self {
+        Vec3 {
+            x: t.0,
+            y: t.1,
+            z: t.2,
+        }
+    }
+}
+
+impl From<(i32, i32, i32)> for Vec3 {
+    fn from(t: (i32, i32, i32)) -> Self {
+        Vec3 {
+            x: t.0 as f32,
+            y: t.1 as f32,
+            z: t.2 as f32,
+        }
+    }
+}

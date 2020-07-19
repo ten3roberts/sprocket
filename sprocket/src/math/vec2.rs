@@ -218,3 +218,21 @@ impl ops::DivAssign<f32> for Vec2 {
         self.y /= rhs;
     }
 }
+
+impl From<(f32, f32)> for Vec2 {
+    fn from(t: (f32, f32)) -> Self {
+        Vec2 {
+            x: t.0,
+            y: t.1,
+        }
+    }
+}
+
+impl From<(i32, i32)> for Vec2 {
+    fn from(t: (i32, i32)) -> Self {
+        Vec2 {
+            x: t.0 as f32,
+            y: t.1 as f32,
+        }
+    }
+}
