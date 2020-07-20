@@ -1,9 +1,6 @@
 use sprocket::*;
 use std::env;
 fn main() {
-    let path = env::current_exe().unwrap();
-    println!("Path: {:?}", path);
-
     utils::normalize_working_dir();
     env::set_current_dir("../../sandbox").expect("Failed to set working directory");
 
