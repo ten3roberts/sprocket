@@ -89,7 +89,7 @@ impl Pipeline {
             .depth_clamp_enable(false)
             .rasterizer_discard_enable(false)
             .polygon_mode(vk::PolygonMode::FILL)
-            .cull_mode(vk::CullModeFlags::BACK)
+            .cull_mode(vk::CullModeFlags::NONE)
             .depth_bias_enable(false)
             .front_face(vk::FrontFace::CLOCKWISE)
             .line_width(1.0)
