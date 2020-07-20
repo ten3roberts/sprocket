@@ -11,8 +11,10 @@ use ash::extensions::khr::Surface;
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
 use ash::{vk, vk::Handle, Entry};
 
-mod swapchain;
 mod texture;
+pub use texture::Texture;
+
+mod swapchain;
 use swapchain::Swapchain;
 
 mod pipeline;

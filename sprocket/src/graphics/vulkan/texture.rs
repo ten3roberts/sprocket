@@ -1,10 +1,15 @@
+use super::{buffer, CommandBuffer, CommandPool, Error, Result, VkAllocator};
 use crate::graphics::Extent2D;
 use ash::version::DeviceV1_0;
 use ash::vk;
+use std::ffi::CString;
+use std::sync::Arc;
 
 pub struct Texture {
+    allocator: Option<VkAllocator>,
     device: ash::Device,
     image: vk::Image,
+    memory: Option<vk_mem::Allocation>,
     view: vk::ImageView,
     format: vk::Format,
     size: vk::DeviceSize,
@@ -12,10 +17,98 @@ pub struct Texture {
     owns_image: bool,
 }
 
+#[link(name = "stb_image", kind = "static")]
+extern "C" {
+    pub fn stbi_load(
+        filename: *const i8,
+        x: *mut i32,
+        y: *mut i32,
+        channels: *mut i32,
+        desired_channels: i32,
+    ) -> *mut u8;
+}
+
 impl Texture {
-    pub fn new(device: &ash::Device, extent: Extent2D) -> Texture {
-        let format = vk::Format::R8G8B8_SRGB;
-        let image_create_info = vk::ImageCreateInfo::builder()
+    // Load a texture from an image file on disk
+    pub fn load(
+        allocator: &VkAllocator,
+        device: &ash::Device,
+        queue: vk::Queue,
+        commandpool: &CommandPool,
+        path: &str,
+    ) -> Result<Texture> {
+        let filename = CString::new(path).expect("Failed to convert path into CString");
+        let mut width = 0;
+        let mut height = 0;
+        let mut channels = 0;
+        let pixels =
+            unsafe { stbi_load(filename.as_ptr(), &mut width, &mut height, &mut channels, 4) };
+
+        if pixels.is_null() {
+            return Err(Error::ImageReadError(path.to_owned()));
+        }
+
+        let image_size: u64 = width as u64 * height as u64 * channels as u64;
+
+        let (staging_buffer, staging_memory, _) = buffer::create_staging(allocator, image_size)?;
+
+        // Copy the data into the staging buffer
+        let data = allocator.borrow().map_memory(&staging_memory)?;
+        unsafe {
+            std::ptr::copy_nonoverlapping(pixels as _, data, image_size as usize);
+        }
+        allocator.borrow().unmap_memory(&staging_memory)?;
+        let format = vk::Format::R8G8B8A8_SRGB;
+        let texture = Texture::new(allocator, device, format, (width, height).into())?;
+
+        transition_image_layout(
+            device,
+            commandpool,
+            queue,
+            texture.image,
+            format,
+            vk::ImageLayout::UNDEFINED,
+            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+        )?;
+
+        buffer::copy_to_image(
+            device,
+            queue,
+            commandpool,
+            staging_buffer,
+            texture.image,
+            texture.extent,
+            vk::ImageAspectFlags::COLOR,
+        )?;
+
+        transition_image_layout(
+            device,
+            commandpool,
+            queue,
+            texture.image,
+            format,
+            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+        )?;
+
+        // Free staging buffer
+        allocator
+            .borrow()
+            .destroy_buffer(staging_buffer, &staging_memory)?;
+
+        // Free the pixels
+        unsafe { Box::from_raw(pixels) };
+        Ok(texture)
+    }
+
+    // Creates a new empty image with undefined dta
+    pub fn new(
+        allocator: &VkAllocator,
+        device: &ash::Device,
+        format: vk::Format,
+        extent: Extent2D,
+    ) -> Result<Texture> {
+        let image_info = vk::ImageCreateInfo::builder()
             .image_type(vk::ImageType::TYPE_2D)
             .extent(vk::Extent3D {
                 width: extent.width,
@@ -27,15 +120,52 @@ impl Texture {
             .format(format)
             .tiling(vk::ImageTiling::OPTIMAL)
             .initial_layout(vk::ImageLayout::UNDEFINED)
+            .usage(vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED)
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
             .samples(vk::SampleCountFlags::TYPE_1);
 
-        let image = unsafe {
-            device
-                .create_image(&image_create_info, None)
-                .expect("Failed to create image")
+        let image_allocation_info = &vk_mem::AllocationCreateInfo {
+            usage: vk_mem::MemoryUsage::GpuOnly,
+            ..Default::default()
         };
-        Texture::new_from_image(device, extent, image, format)
+
+        let (image, memory, _) = allocator
+            .borrow()
+            .create_image(&image_info, image_allocation_info)?;
+
+        // Create image view
+        let view_info = vk::ImageViewCreateInfo::builder()
+            .view_type(vk::ImageViewType::TYPE_2D)
+            .format(format)
+            .components(vk::ComponentMapping {
+                r: vk::ComponentSwizzle::IDENTITY,
+                g: vk::ComponentSwizzle::IDENTITY,
+                b: vk::ComponentSwizzle::IDENTITY,
+                a: vk::ComponentSwizzle::IDENTITY,
+            })
+            .subresource_range(vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            })
+            .image(image);
+
+        let view = unsafe { device.create_image_view(&view_info, None)? };
+        let size = unsafe { device.get_image_memory_requirements(image).size };
+
+        Ok(Texture {
+            allocator: Some(Arc::clone(allocator)),
+            device: device.clone(),
+            image,
+            memory: Some(memory),
+            view,
+            format,
+            extent,
+            size,
+            owns_image: true,
+        })
     }
 
     /// Creates a texture with an already existing image view
@@ -44,7 +174,7 @@ impl Texture {
         extent: Extent2D,
         image: vk::Image,
         format: vk::Format,
-    ) -> Texture {
+    ) -> Result<Texture> {
         let view_create_info = vk::ImageViewCreateInfo::builder()
             .view_type(vk::ImageViewType::TYPE_2D)
             .format(format)
@@ -70,15 +200,17 @@ impl Texture {
 
         let size = unsafe { device.get_image_memory_requirements(image).size };
 
-        Texture {
+        Ok(Texture {
+            allocator: None,
             device: device.clone(),
             image,
+            memory: None,
             view,
             format,
             extent,
             size,
             owns_image: false,
-        }
+        })
     }
 
     pub fn image_view(&self) -> vk::ImageView {
@@ -94,9 +226,90 @@ impl Drop for Texture {
     fn drop(&mut self) {
         unsafe {
             if self.owns_image {
-                self.device.destroy_image(self.image, None);
+                self.allocator
+                    .as_ref()
+                    .expect("Missing allocator for owned image")
+                    .borrow()
+                    .destroy_image(self.image, &self.memory.unwrap())
+                    .expect("Failed to free image")
             }
             self.device.destroy_image_view(self.view, None);
         }
     }
+}
+
+fn transition_image_layout(
+    device: &ash::Device,
+    commandpool: &CommandPool,
+    queue: vk::Queue,
+    image: vk::Image,
+    format: vk::Format,
+    old_layout: vk::ImageLayout,
+    new_layout: vk::ImageLayout,
+) -> Result<()> {
+    let commandbuffer = &mut CommandBuffer::new_primary(device, commandpool, 1)?[0];
+
+    commandbuffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)?;
+
+    let (src_access_mask, dst_access_mask, src_stage_mask, dst_stage_mask) =
+        match (old_layout, new_layout) {
+            (vk::ImageLayout::UNDEFINED, vk::ImageLayout::TRANSFER_DST_OPTIMAL) => (
+                vk::AccessFlags::default(),
+                vk::AccessFlags::TRANSFER_WRITE,
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::PipelineStageFlags::TRANSFER,
+            ),
+            (vk::ImageLayout::TRANSFER_DST_OPTIMAL, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL) => (
+                vk::AccessFlags::TRANSFER_WRITE,
+                vk::AccessFlags::SHADER_READ,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::PipelineStageFlags::FRAGMENT_SHADER,
+            ),
+            (src, dst) => return Err(Error::UnsupportedTransition(src, dst)),
+        };
+
+    let barrier = vk::ImageMemoryBarrier {
+        s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
+        new_layout,
+        old_layout,
+        src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+        dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+        image,
+        subresource_range: vk::ImageSubresourceRange {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            base_mip_level: 0,
+            level_count: 1,
+            base_array_layer: 0,
+            layer_count: 1,
+        },
+        src_access_mask,
+        dst_access_mask,
+        p_next: std::ptr::null(),
+    };
+
+    unsafe {
+        device.cmd_pipeline_barrier(
+            commandbuffer.vk(),
+            src_stage_mask,
+            dst_stage_mask,
+            vk::DependencyFlags::default(),
+            &[],
+            &[],
+            &[barrier],
+        )
+    }
+
+    commandbuffer.end()?;
+
+    CommandBuffer::submit(
+        device,
+        &[&commandbuffer],
+        queue,
+        &[],
+        &[],
+        &[],
+        vk::Fence::null(),
+    )?;
+
+    Ok(())
 }

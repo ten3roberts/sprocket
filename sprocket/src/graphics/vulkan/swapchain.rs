@@ -71,15 +71,20 @@ impl Swapchain {
             // Create textures from the images in swapchain
             let images = swapchain_loader.get_swapchain_images(swapchain)?;
 
-            let images = images
-                .into_iter()
-                .map(|image| Texture::new_from_image(device, extent.into(), image, format.format))
-                .collect();
+            let mut swapchain_images = Vec::with_capacity(images.len());
+            for image in images {
+                swapchain_images.push(Texture::new_from_image(
+                    device,
+                    extent.into(),
+                    image,
+                    format.format,
+                )?)
+            }
 
             Ok(Swapchain {
                 swapchain,
                 swapchain_loader,
-                images,
+                images: swapchain_images,
                 format: format.format,
                 extent: extent.into(),
             })

@@ -15,10 +15,13 @@ pub enum Error {
     UnsupportedAPI(super::Api),
     UnsupportedGPU(super::Api),
     SPVReadError(std::io::Error, String),
+    ImageReadError(String),
     NotRecording,
     MissingMemoryType(vk::MemoryPropertyFlags),
     MismatchedBinding(vk::DescriptorType, u32, u32),
     UnsupportedDescriptorType(vk::DescriptorType),
+    NoAllocator,
+    UnsupportedTransition(vk::ImageLayout, vk::ImageLayout),
 }
 
 impl From<vk::Result> for Error {
@@ -61,12 +64,17 @@ impl std::fmt::Display for Error {
             Error::SPVReadError(e, path) => {
                 write!(f, "Failed to read SPV from file {:?}'{:?}'", path, e)
             }
+            Error::ImageReadError(path) => {
+                write!(f, "Failed to read image from file '{:?}'", path)
+            }
             Error::NotRecording => write!(f, "Command buffer is not in recording state"),
             Error::MissingMemoryType(properties) => {
                 write!(f, "Cannot find GPU memory type supporting {:?}", properties)
             }
             Error::MismatchedBinding(ty, binding_count, supplied_count) => write!(f, "Descriptor set bindings count do not match supplied count for {:?}. Expected {}, supplied {}", ty, binding_count, supplied_count),
             Error::UnsupportedDescriptorType(ty) => write!(f, "Descriptor type {:?} is not supported", ty),
+            Error::NoAllocator => write!(f, "The specified resource has no allocator associated with it"),
+            Error::UnsupportedTransition(src, dst) => write!(f, "The image transition from {:?} to {:?} is not supported", src, dst)
         }
     }
 }
