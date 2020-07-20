@@ -4,8 +4,6 @@ use ash::version::DeviceV1_0;
 use ash::vk;
 use std::ptr;
 
-use log::debug;
-
 pub struct DescriptorSetLayout {
     device: ash::Device,
     layout: vk::DescriptorSetLayout,
@@ -138,9 +136,7 @@ impl DescriptorSet {
                     }
                     ty => return Err(Error::UnsupportedDescriptorType(ty)),
                 }
-                debug!("Binding");
             }
-            debug!("Set");
         }
         unsafe { device.update_descriptor_sets(&descriptor_writes, &[]) };
         Ok(())
