@@ -78,6 +78,7 @@ impl Swapchain {
                     extent.into(),
                     image,
                     format.format,
+                    vk::ImageLayout::UNDEFINED,
                 )?)
             }
 

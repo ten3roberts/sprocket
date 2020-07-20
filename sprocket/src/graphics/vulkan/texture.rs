@@ -12,6 +12,7 @@ pub struct Texture {
     memory: Option<vk_mem::Allocation>,
     view: vk::ImageView,
     format: vk::Format,
+    layout: vk::ImageLayout,
     size: vk::DeviceSize,
     extent: Extent2D,
     owns_image: bool,
@@ -48,29 +49,30 @@ impl Texture {
             return Err(Error::ImageReadError(path.to_owned()));
         }
 
-        let image_size: u64 = width as u64 * height as u64 * channels as u64;
-
-        let (staging_buffer, staging_memory, _) = buffer::create_staging(allocator, image_size)?;
-
-        // Copy the data into the staging buffer
-        let data = allocator.borrow().map_memory(&staging_memory)?;
-        unsafe {
-            std::ptr::copy_nonoverlapping(pixels as _, data, image_size as usize);
-        }
-        allocator.borrow().unmap_memory(&staging_memory)?;
         let format = vk::Format::R8G8B8A8_SRGB;
-        let texture = Texture::new(allocator, device, format, (width, height).into())?;
+        let mut texture = Texture::new(allocator, device, format, (width, height).into())?;
 
+        // Transition layout for transfer
         transition_image_layout(
             device,
             commandpool,
             queue,
             texture.image,
-            format,
             vk::ImageLayout::UNDEFINED,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
         )?;
 
+        // Create and copy image pixel data to stagin buffer
+        let (staging_buffer, staging_memory, _) = buffer::create_staging(allocator, texture.size)?;
+
+        // Copy the data into the staging buffer
+        let data = allocator.borrow().map_memory(&staging_memory)?;
+        unsafe {
+            std::ptr::copy_nonoverlapping(pixels as _, data, texture.size as usize);
+        }
+        allocator.borrow().unmap_memory(&staging_memory)?;
+
+        // Transfer the staging buffer to the image
         buffer::copy_to_image(
             device,
             queue,
@@ -81,15 +83,17 @@ impl Texture {
             vk::ImageAspectFlags::COLOR,
         )?;
 
+        // Transition layout for shader read only optimal
         transition_image_layout(
             device,
             commandpool,
             queue,
             texture.image,
-            format,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
         )?;
+
+        texture.layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
 
         // Free staging buffer
         allocator
@@ -165,6 +169,7 @@ impl Texture {
             extent,
             size,
             owns_image: true,
+            layout: vk::ImageLayout::UNDEFINED,
         })
     }
 
@@ -174,6 +179,7 @@ impl Texture {
         extent: Extent2D,
         image: vk::Image,
         format: vk::Format,
+        layout: vk::ImageLayout,
     ) -> Result<Texture> {
         let view_create_info = vk::ImageViewCreateInfo::builder()
             .view_type(vk::ImageViewType::TYPE_2D)
@@ -210,6 +216,7 @@ impl Texture {
             extent,
             size,
             owns_image: false,
+            layout,
         })
     }
 
@@ -219,6 +226,10 @@ impl Texture {
 
     pub fn image(&self) -> vk::Image {
         self.image
+    }
+
+    pub fn layout(&self) -> vk::ImageLayout {
+        self.layout
     }
 }
 
@@ -243,7 +254,6 @@ fn transition_image_layout(
     commandpool: &CommandPool,
     queue: vk::Queue,
     image: vk::Image,
-    format: vk::Format,
     old_layout: vk::ImageLayout,
     new_layout: vk::ImageLayout,
 ) -> Result<()> {

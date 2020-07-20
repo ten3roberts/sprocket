@@ -1,5 +1,5 @@
-use super::UniformBuffer;
 use super::{Error, Result};
+use super::{Sampler, Texture, UniformBuffer};
 use ash::version::DeviceV1_0;
 use ash::vk;
 use std::ptr;
@@ -86,16 +86,29 @@ impl DescriptorSet {
         Ok(sets.into_iter().map(|set| DescriptorSet { set }).collect())
     }
 
+    /// Updates the specified descriptors taking into account the bindings and provided data
+    /// The number of supplied uniform buffers should match that of the bindings
+    /// The number of supplied textures should match the bindings
+    /// The number of samplers should be the same as the number of textures
+    /// Sampler and textures are combined so that texture [2] uses sampler [2]
     pub fn write(
         device: &ash::Device,
         sets: &[DescriptorSet],
         bindings: &[vk::DescriptorSetLayoutBinding],
         buffers: &[UniformBuffer],
+        textures: &[&Texture],
+        samplers: &[&Sampler],
     ) -> Result<()> {
         // The number of uniform buffers specified in the bindings
         let ub_count = bindings
             .iter()
             .filter(|binding| binding.descriptor_type == vk::DescriptorType::UNIFORM_BUFFER)
+            .count()
+            * sets.len();
+
+        let image_count = bindings
+            .iter()
+            .filter(|binding| binding.descriptor_type == vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
             .count()
             * sets.len();
 
@@ -107,8 +120,25 @@ impl DescriptorSet {
             ));
         }
 
+        if image_count != textures.len() {
+            return Err(Error::MismatchedBinding(
+                vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                image_count as u32,
+                textures.len() as u32,
+            ));
+        }
+
+        if image_count != samplers.len() {
+            return Err(Error::MismatchedBinding(
+                vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                image_count as u32,
+                samplers.len() as u32,
+            ));
+        }
+
         let mut descriptor_writes = Vec::with_capacity(bindings.len() * sets.len());
         let mut buffer_infos = Vec::with_capacity(ub_count);
+        let mut image_infos = Vec::with_capacity(image_count);
 
         for set in sets {
             for binding in bindings {
@@ -130,6 +160,27 @@ impl DescriptorSet {
                             descriptor_count: 1,
                             p_buffer_info: &buffer_infos[buffer_infos.len() - 1],
                             p_image_info: ptr::null(),
+                            p_texel_buffer_view: ptr::null(),
+                            p_next: ptr::null(),
+                        })
+                    }
+                    vk::DescriptorType::COMBINED_IMAGE_SAMPLER => {
+                        let texture = &textures[image_infos.len()];
+                        image_infos.push(vk::DescriptorImageInfo {
+                            image_layout: texture.layout(),
+                            image_view: texture.image_view(),
+                            sampler: samplers[image_infos.len()].vk(),
+                        });
+
+                        descriptor_writes.push(vk::WriteDescriptorSet {
+                            s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
+                            dst_set: set.set,
+                            dst_binding: binding.binding,
+                            dst_array_element: 0,
+                            descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                            descriptor_count: 1,
+                            p_buffer_info: ptr::null(),
+                            p_image_info: &image_infos[image_infos.len() - 1],
                             p_texel_buffer_view: ptr::null(),
                             p_next: ptr::null(),
                         })

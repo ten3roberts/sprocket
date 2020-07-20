@@ -30,6 +30,8 @@ struct Data {
     set_layout: DescriptorSetLayout,
     descriptor_pool: DescriptorPool,
     descriptors: Vec<DescriptorSet>,
+    texture: Texture,
+    sampler: Sampler,
 }
 
 impl Renderer {
@@ -93,7 +95,13 @@ impl Renderer {
         }
 
         let ub_data = UniformBufferObject {
-            model: Mat4::rotate_z(self.frame_count as f32 / 15.0) * Mat4::rotate_y(self.frame_count as f32 / 150.0) * Mat4::translate(Vec3::new(0.0, (self.frame_count as f32 / 50.0).sin() * 0.5, -3.0)),
+            model: Mat4::rotate_z(self.frame_count as f32 / 30.0)
+                * Mat4::rotate_y(self.frame_count as f32 / 150.0)
+                * Mat4::translate(Vec3::new(
+                    0.0,
+                    0.0,
+                    (self.frame_count as f32 / 50.0).sin() * 2.0 - 3.0,
+                )),
             view: Mat4::identity(),
             // proj: Mat4::ortho(window.aspect(), 1.0, 0.0, 100.0),
             proj: Mat4::perspective(window.aspect(), 1.0, 0.0, 1000.0),
@@ -199,22 +207,37 @@ impl Renderer {
             )?);
         }
 
-        let descriptor_bindings = [vk::DescriptorSetLayoutBinding {
-            binding: 0,
-            descriptor_count: 1,
-            descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-            p_immutable_samplers: std::ptr::null(),
-            stage_flags: vk::ShaderStageFlags::VERTEX,
-        }];
+        let descriptor_bindings = [
+            vk::DescriptorSetLayoutBinding {
+                binding: 0,
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                p_immutable_samplers: std::ptr::null(),
+                stage_flags: vk::ShaderStageFlags::VERTEX,
+            },
+            vk::DescriptorSetLayoutBinding {
+                binding: 1,
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                p_immutable_samplers: std::ptr::null(),
+                stage_flags: vk::ShaderStageFlags::FRAGMENT,
+            },
+        ];
 
         let set_layout = DescriptorSetLayout::new(&context.device, &descriptor_bindings)?;
 
         let descriptor_pool = DescriptorPool::new(
             &context.device,
-            &[vk::DescriptorPoolSize {
-                descriptor_count: swapchain.image_count() as u32,
-                ty: vk::DescriptorType::UNIFORM_BUFFER,
-            }],
+            &[
+                vk::DescriptorPoolSize {
+                    descriptor_count: swapchain.image_count() as u32,
+                    ty: vk::DescriptorType::UNIFORM_BUFFER,
+                },
+                vk::DescriptorPoolSize {
+                    descriptor_count: swapchain.image_count() as u32,
+                    ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                },
+            ],
             swapchain.image_count() as u32,
         )?;
 
@@ -224,13 +247,6 @@ impl Renderer {
             &descriptor_pool,
             &set_layout,
             swapchain.image_count() as u32,
-        )?;
-
-        DescriptorSet::write(
-            &context.device,
-            &descriptors,
-            &descriptor_bindings,
-            &uniformbuffers,
         )?;
 
         let pipeline = Pipeline::new(
@@ -248,6 +264,25 @@ impl Renderer {
             false,
         )?;
 
+        let texture = Texture::load(
+            &context.allocator,
+            &context.device,
+            context.graphics_queue,
+            &commandpool,
+            "./data/textures/statue.jpg",
+        )?;
+
+        let sampler = Sampler::new(&context.device)?;
+
+        DescriptorSet::write(
+            &context.device,
+            &descriptors,
+            &descriptor_bindings,
+            &uniformbuffers,
+            &[&texture].repeat(3),
+            &[&sampler].repeat(3),
+        )?;
+
         let mut framebuffers = Vec::with_capacity(swapchain.image_count());
         for i in 0..swapchain.image_count() {
             framebuffers.push(Framebuffer::new(
@@ -262,10 +297,10 @@ impl Renderer {
             CommandBuffer::new_primary(&context.device, &commandpool, swapchain.image_count())?;
 
         let vertices = [
-            Vertex::new(Vec2::new(-0.5, -0.5), Vec3::right()),
-            Vertex::new(Vec2::new(0.5, -0.5), Vec3::right()),
-            Vertex::new(Vec2::new(0.5, 0.5), Vec3::up()),
-            Vertex::new(Vec2::new(-0.5, 0.5), Vec3::forward()),
+            Vertex::new((-0.5, -0.5).into(), (0.0, 0.0).into()),
+            Vertex::new((0.5, -0.5).into(), (1.0, 0.0).into()),
+            Vertex::new((0.5, 0.5).into(), (1.0, 1.0).into()),
+            Vertex::new((-0.5, 0.5).into(), (0.0, 1.0).into()),
         ];
 
         let indices = [0, 1, 2, 2, 3, 0];
@@ -316,6 +351,8 @@ impl Renderer {
             set_layout,
             descriptor_pool,
             descriptors,
+            texture,
+            sampler,
         })
     }
 }

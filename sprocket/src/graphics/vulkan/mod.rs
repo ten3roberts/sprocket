@@ -14,6 +14,9 @@ use ash::{vk, vk::Handle, Entry};
 mod texture;
 pub use texture::Texture;
 
+pub mod sampler;
+pub use sampler::Sampler;
+
 mod swapchain;
 use swapchain::Swapchain;
 
@@ -418,6 +421,7 @@ unsafe fn create_device(
 
     let features = vk::PhysicalDeviceFeatures {
         shader_clip_distance: 1,
+        sampler_anisotropy: vk::TRUE,
         ..Default::default()
     };
 

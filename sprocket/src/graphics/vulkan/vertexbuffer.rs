@@ -8,12 +8,12 @@ use super::{Result, VkAllocator};
 
 pub struct Vertex {
     position: Vec2,
-    color: Vec3,
+    texcoord: Vec2,
 }
 
 impl Vertex {
-    pub fn new(position: Vec2, color: Vec3) -> Vertex {
-        Vertex { position, color }
+    pub fn new(position: Vec2, texcoord: Vec2) -> Vertex {
+        Vertex { position, texcoord }
     }
 
     pub fn binding_description() -> vk::VertexInputBindingDescription {
@@ -37,8 +37,8 @@ impl Vertex {
             vk::VertexInputAttributeDescription::builder()
                 .binding(0)
                 .location(1)
-                .format(vk::Format::R32G32B32_SFLOAT)
-                .offset(offsetof!(Vertex, color) as u32)
+                .format(vk::Format::R32G32_SFLOAT)
+                .offset(offsetof!(Vertex, texcoord) as u32)
                 .build(),
         ]
     }
