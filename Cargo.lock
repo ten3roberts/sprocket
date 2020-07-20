@@ -123,6 +123,7 @@ name = "sprocket"
 version = "0.1.4"
 dependencies = [
  "ash",
+ "cc",
  "colorful",
  "ex",
  "log",
