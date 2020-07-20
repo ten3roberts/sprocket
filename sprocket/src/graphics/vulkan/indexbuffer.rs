@@ -26,17 +26,7 @@ impl IndexBuffer {
             n => (n * std::mem::size_of_val(&indices[0])) as u64,
         };
 
-        let (staging_buffer, staging_memory, _) = allocator.borrow().create_buffer(
-            &vk::BufferCreateInfo::builder()
-                .size(buffer_size)
-                .usage(vk::BufferUsageFlags::TRANSFER_SRC)
-                .sharing_mode(vk::SharingMode::EXCLUSIVE)
-                .build(),
-            &vk_mem::AllocationCreateInfo {
-                usage: vk_mem::MemoryUsage::CpuToGpu,
-                ..Default::default()
-            },
-        )?;
+        let (staging_buffer, staging_memory, _) = buffer::create_staging(allocator, buffer_size)?;
 
         // Copy the data into the buffer
         let data = allocator.borrow().map_memory(&staging_memory)?;
