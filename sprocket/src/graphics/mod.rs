@@ -50,7 +50,7 @@ impl Clone for Extent2D {
     }
 }
 
-impl std::convert::From<ash::vk::Extent2D> for Extent2D {
+impl From<ash::vk::Extent2D> for Extent2D {
     fn from(vkextent: ash::vk::Extent2D) -> Self {
         Extent2D {
             width: vkextent.width,
@@ -59,11 +59,29 @@ impl std::convert::From<ash::vk::Extent2D> for Extent2D {
     }
 }
 
-impl std::convert::From<Extent2D> for ash::vk::Extent2D {
+impl From<Extent2D> for ash::vk::Extent2D {
     fn from(extent: Extent2D) -> Self {
         ash::vk::Extent2D {
             width: extent.width,
             height: extent.height,
+        }
+    }
+}
+
+impl From<(u32, u32)> for Extent2D {
+    fn from(t: (u32, u32)) -> Self {
+        Extent2D {
+            width: t.0,
+            height: t.1,
+        }
+    }
+}
+
+impl From<(i32, i32)> for Extent2D {
+    fn from(t: (i32, i32)) -> Self {
+        Extent2D {
+            width: t.0 as u32,
+            height: t.1 as u32,
         }
     }
 }
