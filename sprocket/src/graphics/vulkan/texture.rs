@@ -49,6 +49,10 @@ impl Texture {
             return Err(Error::ImageReadError(path.to_owned()));
         }
 
+        // The size of the loaded image with alpha channel
+        // May differ from the vkimage memrequirement size
+        let image_size = width * height * 4;
+
         let format = vk::Format::R8G8B8A8_SRGB;
         let mut texture = Texture::new(allocator, device, format, (width, height).into())?;
 
@@ -63,14 +67,14 @@ impl Texture {
         )?;
 
         // Create and copy image pixel data to stagin buffer
-        let (staging_buffer, staging_memory, _) = buffer::create_staging(allocator, texture.size)?;
-
+        let (staging_buffer, staging_memory, staging_info) =
+            buffer::create_staging(allocator, texture.size)?;
         // Copy the data into the staging buffer
-        let data = allocator.borrow().map_memory(&staging_memory)?;
+        let data = staging_info.get_mapped_data();
+
         unsafe {
-            std::ptr::copy_nonoverlapping(pixels as _, data, texture.size as usize);
+            std::ptr::copy_nonoverlapping(pixels as _, data, image_size as usize);
         }
-        allocator.borrow().unmap_memory(&staging_memory)?;
 
         // Transfer the staging buffer to the image
         buffer::copy_to_image(
