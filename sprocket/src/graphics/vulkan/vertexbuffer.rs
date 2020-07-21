@@ -66,18 +66,18 @@ impl VertexBuffer {
         vertices: &[Vertex],
     ) -> Result<VertexBuffer> {
         let buffer_size = match vertices.len() {
-            0 => 1024,
+            0 => DEFAULT_SIZE,
             n => (n * std::mem::size_of_val(&vertices[0])) as u64,
         };
 
-        let (staging_buffer, staging_memory, _) = buffer::create_staging(allocator, buffer_size)?;
+        let (staging_buffer, staging_memory, staging_info) =
+            buffer::create_staging(allocator, buffer_size)?;
 
         // Copy the data into the buffer
-        let data = allocator.borrow().map_memory(&staging_memory)?;
+        let data = staging_info.get_mapped_data();
         unsafe {
             std::ptr::copy_nonoverlapping(vertices.as_ptr() as _, data, buffer_size as usize);
         }
-        allocator.borrow().unmap_memory(&staging_memory)?;
 
         let (buffer, memory, _) = allocator.borrow().create_buffer(
             &vk::BufferCreateInfo::builder()

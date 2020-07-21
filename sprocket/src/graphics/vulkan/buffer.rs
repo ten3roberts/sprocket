@@ -7,6 +7,7 @@ use ash::vk;
 use super::{Error, Result, VkAllocator};
 
 // Creates a staging buffer with specified size
+// Buffer is already mapped on creation
 pub fn create_staging(
     allocator: &VkAllocator,
     size: u64,
@@ -21,6 +22,7 @@ pub fn create_staging(
                 .build(),
             &vk_mem::AllocationCreateInfo {
                 usage: vk_mem::MemoryUsage::CpuToGpu,
+                flags: vk_mem::AllocationCreateFlags::MAPPED,
                 ..Default::default()
             },
         )
