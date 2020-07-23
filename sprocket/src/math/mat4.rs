@@ -27,24 +27,26 @@ impl Mat4 {
     }
 
     pub fn perspective(aspect: f32, fov: f32, near: f32, far: f32) -> Self {
-        let tf = 1.0 / (fov * 0.5).tan();
-
+        let s = 1.0 / (fov * 0.5).tan();
         Mat4([
-            tf / aspect,
+            s / aspect,
             0.0,
             0.0,
             0.0,
+
             0.0,
-            tf,
+            s,
             0.0,
             0.0,
+
             0.0,
             0.0,
-            far / (near - far),
+            -far / (far - near),
             -1.0,
+
             0.0,
             0.0,
-            (near * far) / (near - far),
+            -far * near / (far - near),
             0.0,
         ])
     }
@@ -136,5 +138,17 @@ impl std::fmt::Display for Mat4 {
             &self.0[8..12],
             &self.0[12..]
         )
+    }
+}
+
+impl std::ops::Index<(usize, usize)> for Mat4 {
+    type Output = f32;
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        &self.0[index.0 * 4 + index.1]
+    }
+}
+impl std::ops::IndexMut<(usize, usize)> for Mat4 {
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        &mut self.0[index.0 * 4 + index.1]
     }
 }
