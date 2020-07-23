@@ -7,12 +7,12 @@ use std::sync::Arc;
 use super::{Result, VkAllocator};
 
 pub struct Vertex {
-    position: Vec2,
+    position: Vec3,
     texcoord: Vec2,
 }
 
 impl Vertex {
-    pub fn new(position: Vec2, texcoord: Vec2) -> Vertex {
+    pub fn new(position: Vec3, texcoord: Vec2) -> Vertex {
         Vertex { position, texcoord }
     }
 
@@ -30,7 +30,7 @@ impl Vertex {
             vk::VertexInputAttributeDescription::builder()
                 .binding(0)
                 .location(0)
-                .format(vk::Format::R32G32_SFLOAT)
+                .format(vk::Format::R32G32B32_SFLOAT)
                 .offset(offsetof!(Vertex, position) as u32)
                 .build(),
             // Color

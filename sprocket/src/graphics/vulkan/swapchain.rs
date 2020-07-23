@@ -1,4 +1,4 @@
-use super::texture::Texture;
+use super::{Texture, VkAllocator};
 use crate::graphics::Extent2D;
 use crate::*;
 use ash::vk;
@@ -10,6 +10,7 @@ pub struct Swapchain {
     swapchain: vk::SwapchainKHR,
     swapchain_loader: ash::extensions::khr::Swapchain,
     images: Vec<Texture>,
+    depth_image: Texture,
     format: vk::Format,
     extent: Extent2D,
 }
@@ -19,6 +20,7 @@ impl Swapchain {
         instance: &ash::Instance,
         physical_device: &vk::PhysicalDevice,
         device: &ash::Device,
+        allocator: &VkAllocator,
         surface_loader: &ash::extensions::khr::Surface,
         surface: &vk::SurfaceKHR,
         queue_families: &graphics::vulkan::QueueFamilies,
@@ -82,10 +84,13 @@ impl Swapchain {
                 )?)
             }
 
+            let depth_image = Texture::new_depth(allocator, device, extent.into())?;
+
             Ok(Swapchain {
                 swapchain,
                 swapchain_loader,
                 images: swapchain_images,
+                depth_image,
                 format: format.format,
                 extent: extent.into(),
             })
@@ -145,6 +150,10 @@ impl Swapchain {
 
     pub fn extent(&self) -> Extent2D {
         self.extent
+    }
+
+    pub fn depth_image(&self) -> &Texture {
+        &self.depth_image
     }
 
     /// Returns the index to the next available image in the swapchain

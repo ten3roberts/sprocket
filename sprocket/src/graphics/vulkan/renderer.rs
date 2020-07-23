@@ -97,14 +97,10 @@ impl Renderer {
         let ub_data = UniformBufferObject {
             model: Mat4::rotate_z(self.frame_count as f32 / 30.0)
                 * Mat4::rotate_y(self.frame_count as f32 / 150.0)
-                * Mat4::translate(Vec3::new(
-                    0.0,
-                    0.0,
-                    (self.frame_count as f32 / 50.0).sin() * 2.0 - 3.0,
-                )),
+                * Mat4::translate(Vec3::new(0.0, 0.0, -2.0)),
             view: Mat4::identity(),
-            // proj: Mat4::ortho(window.aspect(), 1.0, 0.0, 100.0),
-            proj: Mat4::perspective(window.aspect(), 1.0, 0.0, 1000.0),
+            proj: Mat4::perspective(window.aspect(), 1.0, 0.1, 10.0),
+            // proj: Mat4::ortho(window.aspect() as f32 * 2.0, 2 as f32, 0.0, 10.0),
         };
 
         iferr!(
@@ -185,13 +181,18 @@ impl Renderer {
             &context.instance,
             &context.physical_device,
             &context.device,
+            &context.allocator,
             &context.surface_loader,
             &context.surface,
             &context.queue_families,
             window.extent(),
         )?;
 
-        let renderpass = RenderPass::new(&context.device, swapchain.format())?;
+        let renderpass = RenderPass::new(
+            &context.device,
+            swapchain.format(),
+            swapchain.depth_image().format(),
+        )?;
 
         let pipeline_spec = pipeline::PipelineSpec {
             vertex_shader: "./data/shaders/default.vert.spv".into(),
@@ -287,7 +288,7 @@ impl Renderer {
         for i in 0..swapchain.image_count() {
             framebuffers.push(Framebuffer::new(
                 &context.device,
-                &[swapchain.image(i)],
+                &[swapchain.image(i), swapchain.depth_image()],
                 &renderpass,
                 swapchain.extent(),
             )?)
@@ -297,13 +298,17 @@ impl Renderer {
             CommandBuffer::new_primary(&context.device, &commandpool, swapchain.image_count())?;
 
         let vertices = [
-            Vertex::new((-0.5, -0.5).into(), (0.0, 0.0).into()),
-            Vertex::new((0.5, -0.5).into(), (1.0, 0.0).into()),
-            Vertex::new((0.5, 0.5).into(), (1.0, 1.0).into()),
-            Vertex::new((-0.5, 0.5).into(), (0.0, 1.0).into()),
+            Vertex::new(Vec3::new(-0.5, -0.5, 0.0), (0.0, 0.0).into()),
+            Vertex::new(Vec3::new(0.5, -0.5, 0.0), (1.0, 0.0).into()),
+            Vertex::new(Vec3::new(0.5, 0.5, 0.0), (1.0, 1.0).into()),
+            Vertex::new(Vec3::new(-0.5, 0.5, 0.0), (0.0, 1.0).into()),
+            Vertex::new(Vec3::new(-0.5, -0.5, 0.5), (0.0, 0.0).into()),
+            Vertex::new(Vec3::new(0.5, -0.5, 0.5), (1.0, 0.0).into()),
+            Vertex::new(Vec3::new(0.5, 0.5, 0.5), (1.0, 1.0).into()),
+            Vertex::new(Vec3::new(-0.5, 0.5, 0.5), (0.0, 1.0).into()),
         ];
 
-        let indices = [0, 1, 2, 2, 3, 0];
+        let indices = [0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4];
 
         let vertexbuffer = VertexBuffer::new(
             &context.allocator,

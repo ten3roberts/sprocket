@@ -54,7 +54,15 @@ impl Texture {
         let image_size = width * height * 4;
 
         let format = vk::Format::R8G8B8A8_SRGB;
-        let mut texture = Texture::new(allocator, device, format, (width, height).into())?;
+        let mut texture = Texture::new(
+            allocator,
+            device,
+            format,
+            vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,
+            vk::ImageAspectFlags::COLOR,
+            vk::ImageTiling::OPTIMAL,
+            (width, height).into(),
+        )?;
 
         // Transition layout for transfer
         transition_image_layout(
@@ -62,6 +70,7 @@ impl Texture {
             commandpool,
             queue,
             texture.image,
+            vk::ImageAspectFlags::COLOR,
             vk::ImageLayout::UNDEFINED,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
         )?;
@@ -93,6 +102,7 @@ impl Texture {
             commandpool,
             queue,
             texture.image,
+            vk::ImageAspectFlags::COLOR,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
         )?;
@@ -109,11 +119,14 @@ impl Texture {
         Ok(texture)
     }
 
-    // Creates a new empty image with undefined dta
+    // Creates a new empty image and image view with undefined dta
     pub fn new(
         allocator: &VkAllocator,
         device: &ash::Device,
         format: vk::Format,
+        usage: vk::ImageUsageFlags,
+        image_aspect: vk::ImageAspectFlags,
+        tiling: vk::ImageTiling,
         extent: Extent2D,
     ) -> Result<Texture> {
         let image_info = vk::ImageCreateInfo::builder()
@@ -126,9 +139,9 @@ impl Texture {
             .mip_levels(1)
             .array_layers(1)
             .format(format)
-            .tiling(vk::ImageTiling::OPTIMAL)
+            .tiling(tiling)
             .initial_layout(vk::ImageLayout::UNDEFINED)
-            .usage(vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED)
+            .usage(usage)
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
             .samples(vk::SampleCountFlags::TYPE_1);
 
@@ -152,7 +165,7 @@ impl Texture {
                 a: vk::ComponentSwizzle::IDENTITY,
             })
             .subresource_range(vk::ImageSubresourceRange {
-                aspect_mask: vk::ImageAspectFlags::COLOR,
+                aspect_mask: image_aspect,
                 base_mip_level: 0,
                 level_count: 1,
                 base_array_layer: 0,
@@ -175,6 +188,27 @@ impl Texture {
             owns_image: true,
             layout: vk::ImageLayout::UNDEFINED,
         })
+    }
+
+    /// Creates a new texture that can be used as a depth attachment
+    /// The contents and layout of the image is undefined
+    pub fn new_depth(
+        allocator: &VkAllocator,
+        device: &ash::Device,
+        extent: Extent2D,
+    ) -> Result<Texture> {
+        let format = vk::Format::D32_SFLOAT;
+        let texture = Texture::new(
+            allocator,
+            device,
+            format,
+            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
+            vk::ImageAspectFlags::DEPTH,
+            vk::ImageTiling::OPTIMAL,
+            extent,
+        )?;
+
+        Ok(texture)
     }
 
     /// Creates a texture with an already existing image view
@@ -235,6 +269,10 @@ impl Texture {
     pub fn layout(&self) -> vk::ImageLayout {
         self.layout
     }
+
+    pub fn format(&self) -> vk::Format {
+        self.format
+    }
 }
 
 impl Drop for Texture {
@@ -258,6 +296,7 @@ fn transition_image_layout(
     commandpool: &CommandPool,
     queue: vk::Queue,
     image: vk::Image,
+    image_aspect: vk::ImageAspectFlags,
     old_layout: vk::ImageLayout,
     new_layout: vk::ImageLayout,
 ) -> Result<()> {
@@ -273,12 +312,20 @@ fn transition_image_layout(
                 vk::PipelineStageFlags::TOP_OF_PIPE,
                 vk::PipelineStageFlags::TRANSFER,
             ),
+            (vk::ImageLayout::UNDEFINED, vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL) => (
+                vk::AccessFlags::default(),
+                vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_READ
+                    | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE,
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS,
+            ),
             (vk::ImageLayout::TRANSFER_DST_OPTIMAL, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL) => (
                 vk::AccessFlags::TRANSFER_WRITE,
                 vk::AccessFlags::SHADER_READ,
                 vk::PipelineStageFlags::TRANSFER,
                 vk::PipelineStageFlags::FRAGMENT_SHADER,
             ),
+
             (src, dst) => return Err(Error::UnsupportedTransition(src, dst)),
         };
 
@@ -290,7 +337,7 @@ fn transition_image_layout(
         dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
         image,
         subresource_range: vk::ImageSubresourceRange {
-            aspect_mask: vk::ImageAspectFlags::COLOR,
+            aspect_mask: image_aspect,
             base_mip_level: 0,
             level_count: 1,
             base_array_layer: 0,
@@ -326,4 +373,8 @@ fn transition_image_layout(
     )?;
 
     Ok(())
+}
+
+fn has_stencil_component(format: vk::Format) -> bool {
+    return format == vk::Format::D32_SFLOAT_S8_UINT || format == vk::Format::D24_UNORM_S8_UINT;
 }

@@ -138,11 +138,19 @@ impl CommandBuffer {
         framebuffer: &Framebuffer,
         clear_color: crate::math::Vec4,
     ) {
-        let clear_values = [vk::ClearValue {
-            color: vk::ClearColorValue {
-                float32: [clear_color.x, clear_color.y, clear_color.z, clear_color.w],
+        let clear_values = [
+            vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: [clear_color.x, clear_color.y, clear_color.z, clear_color.w],
+                },
             },
-        }];
+            vk::ClearValue {
+                depth_stencil: vk::ClearDepthStencilValue {
+                    depth: 1.0,
+                    stencil: 0,
+                },
+            },
+        ];
 
         let renderpass_info = vk::RenderPassBeginInfo::builder()
             .render_pass(renderpass.vk())

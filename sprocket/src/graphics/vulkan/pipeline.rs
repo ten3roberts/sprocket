@@ -133,6 +133,21 @@ impl Pipeline {
             .attachments(&color_blend_attachments)
             .blend_constants([0.0; 4]);
 
+        let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo {
+            s_type: vk::StructureType::PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+            depth_test_enable: vk::TRUE,
+            depth_write_enable: vk::TRUE,
+            depth_compare_op: vk::CompareOp::LESS,
+            depth_bounds_test_enable: vk::FALSE,
+            min_depth_bounds: 0.0,
+            max_depth_bounds: 1.0,
+            stencil_test_enable: vk::FALSE,
+            front: Default::default(),
+            back: Default::default(),
+            flags: Default::default(),
+            p_next: std::ptr::null(),
+        };
+
         // Dynamic state
         // TODO
         // let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::LINE_WIDTH];
@@ -158,6 +173,7 @@ impl Pipeline {
             .rasterization_state(&rasterizer)
             .multisample_state(&multisampling)
             .color_blend_state(&color_blending)
+            .depth_stencil_state(&depth_stencil_state)
             .layout(pipeline_layout)
             .render_pass(renderpass.vk())
             .subpass(0)
