@@ -131,6 +131,12 @@ impl std::fmt::Display for Vec4 {
     }
 }
 
+impl std::fmt::Debug for Vec4 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {}, {}, {})", self.x, self.y, self.z, self.w)
+    }
+}
+
 // Math operators
 
 /// Adds two vectors component wise

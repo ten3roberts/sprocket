@@ -111,6 +111,12 @@ impl std::fmt::Display for Vec2 {
     }
 }
 
+impl std::fmt::Debug for Vec2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
 // Math operators
 
 /// Adds two vectors component wise
@@ -221,10 +227,7 @@ impl ops::DivAssign<f32> for Vec2 {
 
 impl From<(f32, f32)> for Vec2 {
     fn from(t: (f32, f32)) -> Self {
-        Vec2 {
-            x: t.0,
-            y: t.1,
-        }
+        Vec2 { x: t.0, y: t.1 }
     }
 }
 
