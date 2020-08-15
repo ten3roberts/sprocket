@@ -1,6 +1,8 @@
-use crate::event::Event;
-use crate::graphics;
-use crate::graphics::window::{Window, WindowMode};
+use crate::{event::Event, graphics};
+use crate::{
+    graphics::window::{Window, WindowMode},
+    Time,
+};
 use graphics::vulkan::renderer::Renderer;
 use log::{error, info};
 use std::sync::mpsc;
@@ -12,6 +14,7 @@ pub struct Application {
     event_sender: mpsc::Sender<Event>,
     renderer: Option<Renderer>,
     graphics_context: Option<graphics::GraphicsContext>,
+    time: Time,
 }
 
 impl Application {
@@ -27,6 +30,7 @@ impl Application {
             event_sender,
             graphics_context: None,
             renderer: None,
+            time: Time::new(),
         }
     }
 
@@ -60,13 +64,21 @@ impl Application {
 
     pub fn run(&mut self) {
         while !self.windows.is_empty() {
+            info!(
+                "Frame: {}, elapsed: {}, delta: {}, fr: {}, us: {}",
+                self.time.framecount(),
+                self.time.elapsed_f32(),
+                self.time.delta_f32(),
+                self.time.framerate(),
+                self.time.delta_us(),
+            );
             // Process each window for events
             self.windows
                 .iter()
                 .for_each(|window| window.process_events());
 
             if let Some(renderer) = &mut self.renderer {
-                renderer.draw_frame(&self.windows[0]);
+                renderer.draw_frame(&self.windows[0], &self.time);
             }
 
             // Receive and handle events
@@ -77,6 +89,7 @@ impl Application {
                 }
             }
             self.windows.retain(|window| !window.should_close());
+            self.time.update();
         }
     }
 

@@ -65,7 +65,7 @@ impl Renderer {
         })
     }
 
-    pub fn draw_frame(&mut self, window: &Window) {
+    pub fn draw_frame(&mut self, window: &Window, time: &Time) {
         let device = &self.context.device;
 
         vulkan::wait_for_fences(device, &[self.in_flight_fences[self.current_frame]], true);
@@ -96,7 +96,7 @@ impl Renderer {
         let ub_data = UniformBufferObject {
             model:
             // Mat4::rotate_z(self.frame_count as f32 / 30.0),
-            Mat4::rotate_y(self.frame_count as f32 / 150.0)
+            Mat4::rotate_y(time.elapsed_f32())
             * Mat4::translate(Vec3::new(0.0, 0.0, -5.0)),
             view: Mat4::identity(),
             proj: Mat4::perspective(window.aspect(), 1.0, 0.1, 10.0),
