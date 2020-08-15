@@ -6,14 +6,18 @@ use std::sync::Arc;
 
 use super::{Result, VkAllocator};
 
+#[derive(Debug)]
 pub struct Vertex {
-    position: Vec3,
-    texcoord: Vec2,
+    pub position: Vec3,
+    pub uv: Vec2,
 }
 
 impl Vertex {
     pub fn new(position: Vec3, texcoord: Vec2) -> Vertex {
-        Vertex { position, texcoord }
+        Vertex {
+            position,
+            uv: texcoord,
+        }
     }
 
     pub fn binding_description() -> vk::VertexInputBindingDescription {
@@ -38,7 +42,7 @@ impl Vertex {
                 .binding(0)
                 .location(1)
                 .format(vk::Format::R32G32_SFLOAT)
-                .offset(offsetof!(Vertex, texcoord) as u32)
+                .offset(offsetof!(Vertex, uv) as u32)
                 .build(),
         ]
     }

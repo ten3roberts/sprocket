@@ -22,6 +22,9 @@ pub enum Error {
     UnsupportedDescriptorType(vk::DescriptorType),
     NoAllocator,
     UnsupportedTransition(vk::ImageLayout, vk::ImageLayout),
+    XMLError(simple_xml::Error),
+    ParseError,
+    UnimplementedFeature(&'static str),
 }
 
 impl From<vk::Result> for Error {
@@ -45,6 +48,12 @@ impl From<ex::io::Error> for Error {
 impl From<glfw::Error> for Error {
     fn from(error: glfw::Error) -> Self {
         Error::GLFWError(error)
+    }
+}
+
+impl From<simple_xml::Error> for Error {
+    fn from(error: simple_xml::Error) -> Self {
+        Error::XMLError(error)
     }
 }
 
@@ -74,7 +83,10 @@ impl std::fmt::Display for Error {
             Error::MismatchedBinding(ty, binding_count, supplied_count) => write!(f, "Descriptor set bindings count do not match supplied count for {:?}. Expected {}, supplied {}", ty, binding_count, supplied_count),
             Error::UnsupportedDescriptorType(ty) => write!(f, "Descriptor type {:?} is not supported", ty),
             Error::NoAllocator => write!(f, "The specified resource has no allocator associated with it"),
-            Error::UnsupportedTransition(src, dst) => write!(f, "The image transition from {:?} to {:?} is not supported", src, dst)
+            Error::UnsupportedTransition(src, dst) => write!(f, "The image transition from {:?} to {:?} is not supported", src, dst),
+            Error::XMLError(e) => write!(f, "Failed to read xml file {:?}", e),
+            Error::ParseError => write!(f, "Failed to parse string into a type"),
+            Error::UnimplementedFeature(e) => write!(f, "Feature {} is not yet implemented", e),
         }
     }
 }

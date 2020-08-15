@@ -1,4 +1,4 @@
-use super::{DescriptorSet, Framebuffer, IndexBuffer, Pipeline, RenderPass, VertexBuffer};
+use super::{DescriptorSet, Framebuffer, IndexBuffer, Mesh, Pipeline, RenderPass, VertexBuffer};
 use ash::version::DeviceV1_0;
 use ash::vk;
 
@@ -205,6 +205,11 @@ impl CommandBuffer {
                 indexbuffer.index_type(),
             )
         }
+    }
+
+    pub fn bind_mesh(&self, mesh: &Mesh) {
+        self.bind_vertexbuffer(mesh.vertexbuffer());
+        self.bind_indexbuffer(mesh.indexbuffer());
     }
 
     pub fn bind_descriptorsets(&self, pipeline: &Pipeline, descriptor_sets: &[&DescriptorSet]) {

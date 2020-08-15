@@ -24,8 +24,7 @@ struct Data {
     commandbuffers: Vec<CommandBuffer>,
     pipeline: Pipeline,
     framebuffers: Vec<Framebuffer>,
-    vertexbuffer: VertexBuffer,
-    indexbuffer: IndexBuffer,
+    model: Model,
     uniformbuffers: Vec<UniformBuffer>,
     set_layout: DescriptorSetLayout,
     descriptor_pool: DescriptorPool,
@@ -95,9 +94,10 @@ impl Renderer {
         }
 
         let ub_data = UniformBufferObject {
-            model: Mat4::rotate_z(self.frame_count as f32 / 30.0)
-                * Mat4::rotate_y(self.frame_count as f32 / 150.0)
-                * Mat4::translate(Vec3::new(0.0, 0.0, -2.0)),
+            model:
+            // Mat4::rotate_z(self.frame_count as f32 / 30.0),
+            Mat4::rotate_y(self.frame_count as f32 / 150.0)
+            * Mat4::translate(Vec3::new(0.0, 0.0, -5.0)),
             view: Mat4::identity(),
             proj: Mat4::perspective(window.aspect(), 1.0, 0.1, 10.0),
             // proj: Mat4::ortho(window.aspect() as f32 * 2.0, 2 as f32, 0.0, 10.0),
@@ -270,7 +270,7 @@ impl Renderer {
             &context.device,
             context.graphics_queue,
             &commandpool,
-            "./data/textures/statue.jpg",
+            "./data/textures/color_grid.png",
         )?;
 
         let sampler = Sampler::new(&context.device)?;
@@ -297,34 +297,28 @@ impl Renderer {
         let mut commandbuffers =
             CommandBuffer::new_primary(&context.device, &commandpool, swapchain.image_count())?;
 
-        let vertices = [
-            Vertex::new(Vec3::new(-0.5, -0.5, 0.0), (0.0, 0.0).into()),
-            Vertex::new(Vec3::new(0.5, -0.5, 0.0), (1.0, 0.0).into()),
-            Vertex::new(Vec3::new(0.5, 0.5, 0.0), (1.0, 1.0).into()),
-            Vertex::new(Vec3::new(-0.5, 0.5, 0.0), (0.0, 1.0).into()),
-            Vertex::new(Vec3::new(-0.5, -0.5, 0.5), (0.0, 0.0).into()),
-            Vertex::new(Vec3::new(0.5, -0.5, 0.5), (1.0, 0.0).into()),
-            Vertex::new(Vec3::new(0.5, 0.5, 0.5), (1.0, 1.0).into()),
-            Vertex::new(Vec3::new(-0.5, 0.5, 0.5), (0.0, 1.0).into()),
-        ];
-
-        let indices = [0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4];
-
-        let vertexbuffer = VertexBuffer::new(
+        let model = Model::load(
+            "./data/models/suzanne.dae",
             &context.allocator,
             &context.device,
             context.graphics_queue,
             &commandpool,
-            &vertices,
         )?;
+        let mesh = model.get_mesh_index(0).unwrap();
+        // let mesh = Mesh::new(
+        //     &context.allocator,
+        //     &context.device,
+        //     context.graphics_queue,
+        //     &commandpool,
+        //     &vertices,
+        //     &indices,
+        // )?;
 
-        let indexbuffer = IndexBuffer::new(
-            &context.allocator,
-            &context.device,
-            context.graphics_queue,
-            &commandpool,
-            &indices,
-        )?;
+        // info!(
+        //     "Mesh: v count: {},i count: {}",
+        //     mesh.vertex_count(),
+        //     mesh.index_count()
+        // );
 
         // Prerecord commandbuffers
         for (i, commandbuffer) in commandbuffers.iter_mut().enumerate() {
@@ -335,10 +329,9 @@ impl Renderer {
                 math::Vec4::new(0.0, 0.0, 0.01, 1.0),
             );
             commandbuffer.bind_pipeline(&pipeline);
-            commandbuffer.bind_vertexbuffer(&vertexbuffer);
-            commandbuffer.bind_indexbuffer(&indexbuffer);
             commandbuffer.bind_descriptorsets(&pipeline, &[&descriptors[i]]);
-            commandbuffer.draw_indexed(indexbuffer.count());
+            commandbuffer.bind_mesh(mesh);
+            commandbuffer.draw_indexed(mesh.index_count());
             commandbuffer.end_renderpass();
             commandbuffer.end()?;
         }
@@ -350,8 +343,7 @@ impl Renderer {
             commandbuffers,
             pipeline,
             framebuffers,
-            vertexbuffer,
-            indexbuffer,
+            model,
             uniformbuffers,
             set_layout,
             descriptor_pool,
