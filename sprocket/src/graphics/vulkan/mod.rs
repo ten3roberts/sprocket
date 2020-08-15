@@ -49,6 +49,12 @@ pub use uniformbuffer::UniformBufferObject;
 pub mod descriptors;
 pub use descriptors::{DescriptorPool, DescriptorSet, DescriptorSetLayout};
 
+pub mod mesh;
+pub use mesh::Mesh;
+
+pub mod model;
+pub use model::Model;
+
 mod buffer;
 
 pub use super::{Error, Result};
@@ -246,9 +252,9 @@ fn create_debug_messenger(
 ) -> Result<vk::DebugUtilsMessengerEXT> {
     let create_info = vk::DebugUtilsMessengerCreateInfoEXT {
         s_type: vk::StructureType::DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-        message_severity: vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE
-            | vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
-            | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
+        message_severity: vk::DebugUtilsMessageSeverityFlagsEXT::WARNING | {
+            vk::DebugUtilsMessageSeverityFlagsEXT::ERROR
+        },
         message_type: vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
             | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION
             | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE,
