@@ -24,5 +24,8 @@ ex = "0.1.3"
 # Vulkan memory allocator
 vk-mem = "0.2.2"
 
+# XML parsing
+simple-xml = "0.1.10"
+
 [build-dependencies]
 cc = "1.0"
