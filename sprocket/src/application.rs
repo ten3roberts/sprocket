@@ -1,7 +1,7 @@
 use crate::{event::Event, graphics};
 use crate::{
     graphics::window::{Window, WindowMode},
-    Time,
+    Time, Timer,
 };
 use graphics::vulkan::renderer::Renderer;
 use log::{error, info};
@@ -63,15 +63,20 @@ impl Application {
     }
 
     pub fn run(&mut self) {
+        let mut timer = Timer::with_target(std::time::Duration::from_secs(5));
         while !self.windows.is_empty() {
-            info!(
-                "Frame: {}, elapsed: {}, delta: {}, fr: {}, us: {}",
-                self.time.framecount(),
-                self.time.elapsed_f32(),
-                self.time.delta_f32(),
-                self.time.framerate(),
-                self.time.delta_us(),
-            );
+            if timer.signaled() {
+                info!(
+                    "Frame: {}, elapsed: {}, delta: {}, fr: {}, us: {}",
+                    self.time.framecount(),
+                    self.time.elapsed_f32(),
+                    self.time.delta_f32(),
+                    self.time.framerate(),
+                    self.time.delta_us(),
+                );
+                timer.restart();
+            }
+            info!("Remaining: {}", timer.remaining_ms().unwrap_or(0));
             // Process each window for events
             self.windows
                 .iter()

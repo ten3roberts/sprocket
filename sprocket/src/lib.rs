@@ -12,5 +12,8 @@ pub use graphics::window::{Window, WindowMode};
 pub use log::{debug, error, info, trace, warn};
 pub use math::{Vec2, Vec3, Vec4};
 
-pub mod time;
+mod time;
 pub use time::Time;
+
+mod timer;
+pub use timer::Timer;
