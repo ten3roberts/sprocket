@@ -16,9 +16,7 @@ impl Model {
         queue: vk::Queue,
         commandpool: &CommandPool,
     ) -> Result<Model> {
-        log::debug!("Loading model {}", path);
         let root = simple_xml::from_string(&fs::read_to_string(path)?)?;
-        log::debug!("Loaded xml");
         let lib_geometries = &root.try_get_nodes("library_geometries")?[0];
         let mut meshes = HashMap::new();
 
