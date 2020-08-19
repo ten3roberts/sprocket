@@ -39,16 +39,14 @@ impl UniformBuffer {
     }
 
     /// Writes data to the uniformbuffer in device memory
-    pub fn write<T>(&self, data: &T, offset: Option<u64>, size: Option<u64>) -> Result<()> {
+    pub fn write<T>(&self, data: &T, offset: Option<u64>) -> Result<()> {
         let data: *const T = data;
-        let size = size.unwrap_or(self.size);
+        let size = std::mem::size_of::<T>();
         let offset = offset.unwrap_or(0);
 
         // Copy the data into the buffer
         let mapped: *mut u8 = self.allocator.borrow().map_memory(&self.memory)?;
-        unsafe {
-            std::ptr::copy_nonoverlapping(data as _, mapped.offset(offset as isize), size as usize);
-        }
+        unsafe { std::ptr::copy_nonoverlapping(data as _, mapped.offset(offset as isize), size) }
         self.allocator.borrow().unmap_memory(&self.memory)?;
 
         Ok(())

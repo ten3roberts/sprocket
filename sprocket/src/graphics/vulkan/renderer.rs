@@ -105,7 +105,7 @@ impl Renderer {
 
         iferr!(
             "Failed to write to uniformbuffer",
-            self.data.uniformbuffers[image_index as usize].write(&ub_data, None, None)
+            self.data.uniformbuffers[image_index as usize].write(&ub_data, None)
         );
 
         // Check if a previous frame is using this image (i.e. there is its fence to wait on)
