@@ -119,8 +119,8 @@ impl Swapchain {
                 return *mode;
             }
         }
-        info!("Choosing FIFO present mode");
-        vk::PresentModeKHR::FIFO
+        info!("Choosing IMMEDIATE present mode");
+        vk::PresentModeKHR::IMMEDIATE
     }
 
     fn pick_extent(capabilities: &vk::SurfaceCapabilitiesKHR, extent: Extent2D) -> vk::Extent2D {

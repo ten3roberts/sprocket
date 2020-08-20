@@ -76,7 +76,6 @@ impl Application {
                 );
                 timer.restart();
             }
-            info!("Remaining: {}", timer.remaining_ms().unwrap_or(0));
             // Process each window for events
             self.windows
                 .iter()
