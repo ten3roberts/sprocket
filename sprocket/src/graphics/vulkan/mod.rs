@@ -56,8 +56,10 @@ pub mod model;
 pub use model::Model;
 
 mod buffer;
-
 pub use super::{Error, Result};
+
+mod resources;
+pub use resources::ResourceManager;
 
 pub type VkAllocator = Arc<RefCell<vk_mem::Allocator>>;
 

@@ -25,7 +25,7 @@ struct Data {
     commandbuffers: Vec<CommandBuffer>,
     pipeline: Pipeline,
     framebuffers: Vec<Framebuffer>,
-    model: Model,
+    model: Arc<Model>,
     uniformbuffers: Vec<UniformBuffer>,
     set_layout: DescriptorSetLayout,
     descriptor_pool: DescriptorPool,
@@ -302,13 +302,9 @@ impl Renderer {
         let mut commandbuffers =
             CommandBuffer::new_primary(&context.device, &commandpool, swapchain.image_count())?;
 
-        let model = Model::load(
-            "./data/models/suzanne.dae",
-            &context.allocator,
-            &context.device,
-            context.graphics_queue,
-            &commandpool,
-        )?;
+        let _model = resourcemanager.load_model("./data/models/cube.dae")?;
+        let model = resourcemanager.load_model("./data/models/suzanne.dae")?;
+
         let mesh = model.get_mesh_index(0).unwrap();
         // let mesh = Mesh::new(
         //     &context.allocator,
