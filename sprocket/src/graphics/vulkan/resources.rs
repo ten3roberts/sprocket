@@ -113,13 +113,15 @@ impl<T: Resource> ResourceSystem<T> {
     }
 
     pub fn info(&self) -> Vec<ResourceInfo> {
+        let ty = std::any::type_name::<T>();
+        let ty = &ty[ty.rfind("::").map(|v| v + 2).unwrap_or(0)..];
         self.resources
             .read()
             .unwrap()
             .iter()
             .map(|(k, v)| ResourceInfo {
                 name: k.to_owned(),
-                ty: std::any::type_name::<T>(),
+                ty,
                 strong_refs: Arc::strong_count(v),
                 weak_refs: Arc::weak_count(v),
             })
