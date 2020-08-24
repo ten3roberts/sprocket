@@ -35,22 +35,104 @@ pub struct ResourceInfo {
 ///
 /// Requires a load function
 pub trait Resource {
-    type Output;
     /// Trait function used to load a function
     /// Provides resourcemanager for access to e.g other resources and graphics context
     /// Resource loading should not have many sideeffects and produce similar results when loaded several times from the same file
-    fn load(resourcemanager: &ResourceManager, path: &str) -> Self::Output;
+    fn load(resourcemanager: &ResourceManager, path: &str) -> Result<Self>
+    where
+        Self: Sized;
+}
+
+/// Manages a single type of resource
+/// Used internally in ResourceManager
+/// Should not be used standalone but can be used to assemble your own type of resource manager
+pub struct ResourceSystem<T: Resource> {
+    resources: RwLock<HashMap<String, Arc<T>>>,
+    garbage: Mutex<Vec<Garbage<T>>>,
+}
+
+impl<T: Resource> ResourceSystem<T> {
+    pub fn new() -> Self {
+        ResourceSystem {
+            resources: RwLock::new(HashMap::new()),
+            garbage: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Loads and stores a resource if it doesn't already exist
+    /// The resource will be stored as the path name
+    /// If a resource with the name already exists, the existing one will be returned
+    /// Will wait for write lock of textures
+    pub fn load(&self, resourcemanager: &ResourceManager, path: &str) -> Result<Arc<T>> {
+        match self.resources.read().unwrap().get(path) {
+            Some(resource) => return Ok(Arc::clone(resource)),
+            None => {}
+        }
+
+        // Load outside match to drop RwLock read guard
+        let resource = Arc::new(T::load(resourcemanager, path)?);
+
+        self.resources
+            .write()
+            .unwrap()
+            .insert(path.to_owned(), Arc::clone(&resource));
+        Ok(resource)
+    }
+
+    /// path to return a reference to an already loaded texture
+    /// Returns None if the texture isn't loaded
+    pub fn get(&self, path: &str) -> Option<Arc<T>> {
+        self.resources
+            .read()
+            .unwrap()
+            .get(path)
+            .map(|v| Arc::clone(v))
+    }
+
+    /// Goes through the loaded resources and places all resources with no other references in a garbage
+    /// The actual resource will get deleted after garbage_cycles cleanup cycles so that it is no longer in use by a pipeline
+    pub fn collect_garbage(&self, garbage_cycles: u32) {
+        // Acquire a lock for the whole function to avoid having a resource getting a user midway through TOCTOU
+        let mut garbage = self.garbage.lock().unwrap();
+        let mut resources = self.resources.write().unwrap();
+
+        // Remove garbage with 0 cycles remaining
+        garbage.retain(|v| v.cycles_remaining > 0);
+        // Remove one cycle from existing garbage
+        garbage.iter_mut().for_each(|v| v.cycles_remaining -= 1);
+
+        // Remove all elements with one 1 (self) strong reference and place into garbage
+        resources.retain(|_, r| {
+            if Arc::strong_count(&r) == 1 {
+                garbage.push(Garbage::new(Arc::clone(&r), garbage_cycles));
+                false
+            } else {
+                true
+            }
+        });
+    }
+
+    pub fn info(&self) -> Vec<ResourceInfo> {
+        self.resources
+            .read()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| ResourceInfo {
+                name: k.to_owned(),
+                ty: std::any::type_name::<T>(),
+                strong_refs: Arc::strong_count(v),
+                weak_refs: Arc::weak_count(v),
+            })
+            .collect()
+    }
 }
 
 /// Keeps track of loaded resources across threads
 /// Automatically reference counts resources and removes no longer used ones with .cleanup()
 pub struct ResourceManager {
     context: Arc<VulkanContext>,
-    textures: RwLock<HashMap<String, Arc<Texture>>>,
-    texture_garbage: Mutex<Vec<Garbage<Texture>>>,
-
-    models: RwLock<HashMap<String, Arc<Model>>>,
-    model_garbage: Mutex<Vec<Garbage<Model>>>,
+    textures: ResourceSystem<Texture>,
+    models: ResourceSystem<Model>,
 }
 
 impl ResourceManager {
@@ -59,10 +141,8 @@ impl ResourceManager {
     pub fn new(context: Arc<VulkanContext>) -> Self {
         ResourceManager {
             context,
-            textures: RwLock::new(HashMap::new()),
-            texture_garbage: Mutex::new(Vec::new()),
-            models: RwLock::new(HashMap::new()),
-            model_garbage: Mutex::new(Vec::new()),
+            textures: ResourceSystem::new(),
+            models: ResourceSystem::new(),
         }
     }
 
@@ -75,23 +155,13 @@ impl ResourceManager {
     /// If a texture with the name already exists, the existing one will be returned
     /// Will wait for write lock of textures
     pub fn load_texture(&self, path: &str) -> Result<Arc<Texture>> {
-        Ok(Arc::clone(
-            self.textures
-                .write()
-                .unwrap()
-                .entry(path.to_owned())
-                .or_insert(Arc::new(Texture::load(self, path)?)),
-        ))
+        self.textures.load(&self, path)
     }
 
     /// path to return a reference to an already loaded texture
     /// Returns None if the texture isn't loaded
     pub fn get_texture(&self, path: &str) -> Option<Arc<Texture>> {
-        self.textures
-            .read()
-            .unwrap()
-            .get(path)
-            .map(|v| Arc::clone(v))
+        self.textures.get(path)
     }
 
     /// Loads and stores a model if it doesn't already exist
@@ -100,106 +170,29 @@ impl ResourceManager {
     /// Will wait for write lock of textures
     /// Will not block for write access if model is already loaded
     pub fn load_model(&self, path: &str) -> Result<Arc<Model>> {
-        match self.models.read().unwrap().get(path) {
-            Some(model) => return Ok(Arc::clone(model)),
-            None => {}
-        }
-
-        // Load outside match to drop RwLock read guard
-        let model = Arc::new(Model::load(self, path)?);
-
-        self.models
-            .write()
-            .unwrap()
-            .insert(path.to_owned(), Arc::clone(&model));
-        Ok(model)
+        self.models.load(self, path)
     }
 
     /// path to return a reference to an already loaded model
     /// Returns None if the model isn't loaded
     pub fn get_model(&self, path: &str) -> Option<Arc<Model>> {
-        self.models.read().unwrap().get(path).map(|v| Arc::clone(v))
+        self.models.get(path)
     }
 
-    /// Will place each resource no longer used in a cleanup stack
-    /// The actual resource will get deleted after SWAPCHAIN_IMAGE_COUNT cleanup cycles so that it is no longer in use by a pipeline
+    /// Will place each resource no longer used in a garbage list
+    /// The actual resource will get deleted after garbage_cycles cleanup cycles so that it is no longer in use by a pipeline
     /// Should only be called from one thread to avoid thread blocking
-    /// garbage_cycles: After how many cycles garbage should assumed to no longer be in pipeline and can safely be discarded
-    pub fn cleanup(&self, garbage_cycles: u32) {
-        self.cleanup_textures(garbage_cycles);
-        self.cleanup_models(garbage_cycles);
+    pub fn collect_garbage(&self, garbage_cycles: u32) {
+        self.textures.collect_garbage(garbage_cycles);
+        self.models.collect_garbage(garbage_cycles);
     }
 
-    fn cleanup_textures(&self, garbage_cycles: u32) {
-        // Acquire a lock for the whole function to avoid having a resource getting a user midway through TOCTOU
-        let mut garbage = self.texture_garbage.lock().unwrap();
-        let mut textures = self.textures.write().unwrap();
-
-        // Remove garbage with 0 cycles remaining
-        garbage.retain(|v| v.cycles_remaining > 0);
-        // Remove one cycle from existing garbage
-        garbage.iter_mut().for_each(|v| v.cycles_remaining -= 1);
-
-        // Remove all elements with one 1 (self) strong reference and place into garbage
-        textures.retain(|_, r| {
-            if Arc::strong_count(&r) == 1 {
-                garbage.push(Garbage::new(Arc::clone(&r), garbage_cycles));
-                false
-            } else {
-                true
-            }
-        });
-    }
-
-    fn cleanup_models(&self, garbage_cycles: u32) {
-        // Acquire a lock for the whole function to avoid having a resource getting a user midway through TOCTOU
-        let mut garbage = self.model_garbage.lock().unwrap();
-        let mut models = self.models.write().unwrap();
-
-        // Remove garbage with 0 cycles remaining
-        garbage.retain(|v| v.cycles_remaining > 0);
-        // Remove one cycle from existing garbage
-        garbage.iter_mut().for_each(|v| v.cycles_remaining -= 1);
-
-        // Remove all elements with one 1 (self) strong reference and place into garbage
-        models.retain(|_, r| {
-            if Arc::strong_count(&r) == 1 {
-                garbage.push(Garbage::new(Arc::clone(&r), garbage_cycles));
-                false
-            } else {
-                true
-            }
-        });
-    }
     /// Returns a descripctive status about the resources currently managed
     pub fn info(&self) -> Vec<ResourceInfo> {
         let mut result = Vec::new();
-        // Textures
-        result.extend(
-            self.textures
-                .read()
-                .unwrap()
-                .iter()
-                .map(|(k, r)| ResourceInfo {
-                    name: k.to_owned(),
-                    ty: "Texture",
-                    strong_refs: Arc::strong_count(r),
-                    weak_refs: Arc::weak_count(r),
-                }),
-        );
+        result.extend(self.textures.info());
+        result.extend(self.models.info());
 
-        result.extend(
-            self.models
-                .read()
-                .unwrap()
-                .iter()
-                .map(|(k, r)| ResourceInfo {
-                    name: k.to_owned(),
-                    ty: "Model",
-                    strong_refs: Arc::strong_count(r),
-                    weak_refs: Arc::weak_count(r),
-                }),
-        );
         result
     }
 }

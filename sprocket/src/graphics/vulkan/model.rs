@@ -8,9 +8,8 @@ pub struct Model {
 }
 
 impl Resource for Model {
-    type Output = Result<Self>;
     // Loads a model from a collada file into meshes
-    fn load(resourcemanager: &super::ResourceManager, path: &str) -> Self::Output {
+    fn load(resourcemanager: &super::ResourceManager, path: &str) -> Result<Self> {
         let context = resourcemanager.context();
         let allocator = &context.allocator;
         let device = &context.device;

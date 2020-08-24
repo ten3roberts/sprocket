@@ -73,12 +73,12 @@ impl Application {
     }
 
     pub fn run(&mut self) {
-        let mut cleanup_timer = Timer::with_target(time::Duration::from_secs(2));
+        let mut garbage_timer = Timer::with_target(time::Duration::from_secs(2));
         let mut timer = Timer::with_target(time::Duration::from_secs(5));
         while !self.windows.is_empty() {
-            if cleanup_timer.signaled() {
-                self.resource_manager.as_ref().unwrap().cleanup(5); // Change to swapchain.image_count() in renderer system
-                cleanup_timer.restart();
+            if garbage_timer.signaled() {
+                self.resource_manager.as_ref().unwrap().collect_garbage(5); // Change to swapchain.image_count() in renderer system
+                garbage_timer.restart();
             }
             if timer.signaled() {
                 info!(

@@ -30,10 +30,8 @@ extern "C" {
 }
 
 impl Resource for Texture {
-    type Output = Result<Self>;
-
     // Load a texture from an image file on disk
-    fn load(resourcemanager: &super::ResourceManager, path: &str) -> Self::Output {
+    fn load(resourcemanager: &super::ResourceManager, path: &str) -> Result<Self> {
         let context = resourcemanager.context();
         let allocator = &context.allocator;
         let device = &context.device;
