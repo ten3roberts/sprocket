@@ -3,9 +3,12 @@ use crate::{
     graphics::window::{Window, WindowMode},
     Time, Timer,
 };
-use graphics::vulkan::renderer::Renderer;
+use graphics::vulkan::{renderer::Renderer, ResourceManager};
 use log::{error, info};
-use std::sync::mpsc;
+use std::{
+    sync::{mpsc, Arc},
+    time,
+};
 
 pub struct Application {
     name: String,
@@ -14,6 +17,7 @@ pub struct Application {
     event_sender: mpsc::Sender<Event>,
     renderer: Option<Renderer>,
     graphics_context: Option<graphics::GraphicsContext>,
+    resource_manager: Option<Arc<ResourceManager>>,
     time: Time,
 }
 
@@ -29,6 +33,7 @@ impl Application {
             event_receiver,
             event_sender,
             graphics_context: None,
+            resource_manager: None,
             renderer: None,
             time: Time::new(),
         }
@@ -46,7 +51,12 @@ impl Application {
         // Create vulkan renderer if vulkan
         if let graphics::GraphicsContext::Vulkan(context) = self.graphics_context.as_ref().unwrap()
         {
-            self.renderer = match Renderer::new(context.clone(), &self.windows[0]) {
+            self.resource_manager = Some(Arc::new(ResourceManager::new(Arc::clone(context))));
+            self.renderer = match Renderer::new(
+                Arc::clone(context),
+                &self.windows[0],
+                Arc::clone(&self.resource_manager.as_ref().unwrap()),
+            ) {
                 Ok(renderer) => Some(renderer),
                 Err(e) => {
                     error!("Failed to create renderer '{}'", e);
@@ -63,8 +73,13 @@ impl Application {
     }
 
     pub fn run(&mut self) {
-        let mut timer = Timer::with_target(std::time::Duration::from_secs(5));
+        let mut cleanup_timer = Timer::with_target(time::Duration::from_secs(2));
+        let mut timer = Timer::with_target(time::Duration::from_secs(5));
         while !self.windows.is_empty() {
+            if cleanup_timer.signaled() {
+                self.resource_manager.as_ref().unwrap().cleanup();
+                cleanup_timer.restart();
+            }
             if timer.signaled() {
                 info!(
                     "Frame: {}, elapsed: {}, delta: {}, fr: {}, us: {}",
@@ -73,6 +88,10 @@ impl Application {
                     self.time.delta_f32(),
                     self.time.framerate(),
                     self.time.delta_us(),
+                );
+                info!(
+                    "Resources: {:?}",
+                    self.resource_manager.as_ref().unwrap().info()
                 );
                 timer.restart();
             }
@@ -104,6 +123,7 @@ impl Application {
 
 impl Drop for Application {
     fn drop(&mut self) {
+        self.resource_manager = None;
         Window::terminate_glfw();
     }
 }

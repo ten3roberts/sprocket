@@ -21,10 +21,10 @@ mod swapchain;
 use swapchain::Swapchain;
 
 mod pipeline;
-use pipeline::Pipeline;
+pub use pipeline::Pipeline;
 
 mod renderpass;
-use renderpass::RenderPass;
+pub use renderpass::RenderPass;
 
 mod framebuffer;
 use framebuffer::Framebuffer;
@@ -74,6 +74,32 @@ pub struct VulkanContext {
     graphics_queue: vk::Queue,
     present_queue: vk::Queue,
     allocator: VkAllocator,
+    /// A pool for on-off operations like transfers
+    generic_pool: Option<CommandPool>,
+}
+
+impl VulkanContext {
+    pub fn generic_pool(&self) -> &CommandPool {
+        self.generic_pool.as_ref().unwrap()
+    }
+}
+
+impl Drop for VulkanContext {
+    fn drop(&mut self) {
+        info!("Dropping vulkan context");
+        self.generic_pool = None;
+        unsafe {
+            self.allocator.borrow_mut().destroy();
+            // Drop data before device
+            // This will later migrate out to materials and alike
+            self.device.device_wait_idle().unwrap();
+            self.device.destroy_device(None);
+            self.surface_loader.destroy_surface(self.surface, None);
+            self.debug_utils_loader
+                .destroy_debug_utils_messenger(self.debug_messenger, None);
+            self.instance.destroy_instance(None);
+        }
+    }
 }
 
 pub struct QueueFamilies {
@@ -168,6 +194,8 @@ pub fn init(window: &Window) -> Result<VulkanContext> {
 
         let allocator = Arc::new(RefCell::new(vk_mem::Allocator::new(&allocator_info)?));
 
+        let generic_pool = CommandPool::new(&device, queue_families.graphics.unwrap(), true, true)?;
+
         Ok(VulkanContext {
             entry,
             instance,
@@ -181,6 +209,7 @@ pub fn init(window: &Window) -> Result<VulkanContext> {
             graphics_queue,
             present_queue,
             allocator,
+            generic_pool: Some(generic_pool),
         })
     }
 
@@ -471,23 +500,6 @@ fn reset_fences(device: &ash::Device, fences: &[vk::Fence]) {
     unsafe {
         if let Err(e) = device.reset_fences(fences) {
             error!("Failed to wait on fences '{}'", e);
-        }
-    }
-}
-
-impl Drop for VulkanContext {
-    fn drop(&mut self) {
-        info!("Dropping vulkan context");
-        unsafe {
-            self.allocator.borrow_mut().destroy();
-            // Drop data before device
-            // This will later migrate out to materials and alike
-            self.device.device_wait_idle().unwrap();
-            self.device.destroy_device(None);
-            self.surface_loader.destroy_surface(self.surface, None);
-            self.debug_utils_loader
-                .destroy_debug_utils_messenger(self.debug_messenger, None);
-            self.instance.destroy_instance(None);
         }
     }
 }

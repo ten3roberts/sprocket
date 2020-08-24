@@ -8,6 +8,7 @@ const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
 pub struct Renderer {
     context: Arc<VulkanContext>,
+    resourcemanager: Arc<ResourceManager>,
     image_available_semaphores: Vec<vk::Semaphore>,
     render_finished_semaphores: Vec<vk::Semaphore>,
     in_flight_fences: Vec<vk::Fence>,
@@ -29,12 +30,16 @@ struct Data {
     set_layout: DescriptorSetLayout,
     descriptor_pool: DescriptorPool,
     descriptors: Vec<DescriptorSet>,
-    texture: Texture,
+    texture: Arc<Texture>,
     sampler: Sampler,
 }
 
 impl Renderer {
-    pub fn new(context: Arc<VulkanContext>, window: &Window) -> Result<Renderer> {
+    pub fn new(
+        context: Arc<VulkanContext>,
+        window: &Window,
+        resourcemanager: Arc<ResourceManager>,
+    ) -> Result<Renderer> {
         let mut image_available_semaphores = Vec::new();
         let mut render_finished_semaphores = Vec::new();
         let mut in_flight_fences = Vec::new();
@@ -47,7 +52,7 @@ impl Renderer {
             in_flight_fences.push(vulkan::create_fence(&context.device)?);
         }
 
-        let data = Self::create_data(&context, window)?;
+        let data = Self::create_data(&context, window, &resourcemanager)?;
 
         for _ in 0..data.swapchain.image_count() {
             images_in_flight.push(vk::Fence::null());
@@ -62,6 +67,7 @@ impl Renderer {
             current_frame: 0,
             data,
             frame_count: 0,
+            resourcemanager,
         })
     }
 
@@ -172,11 +178,15 @@ impl Renderer {
 
         self.data = iferr!(
             "Failed to recreate renderer",
-            Self::create_data(&self.context, window)
+            Self::create_data(&self.context, window, &self.resourcemanager)
         );
     }
 
-    fn create_data(context: &Arc<VulkanContext>, window: &Window) -> Result<Data> {
+    fn create_data(
+        context: &Arc<VulkanContext>,
+        window: &Window,
+        resourcemanager: &Arc<ResourceManager>,
+    ) -> Result<Data> {
         let swapchain = Swapchain::new(
             &context.instance,
             &context.physical_device,
@@ -265,14 +275,9 @@ impl Renderer {
             false,
         )?;
 
-        let texture = Texture::load(
-            &context.allocator,
-            &context.device,
-            context.graphics_queue,
-            &commandpool,
-            "./data/textures/color_grid.png",
-        )?;
-
+        // This will be cleaned up
+        let _texture = resourcemanager.load_texture("./data/textures/color_grid.png")?;
+        let texture = resourcemanager.load_texture("./data/textures/grid.png")?;
         let sampler = Sampler::new(&context.device)?;
 
         DescriptorSet::write(
@@ -280,7 +285,7 @@ impl Renderer {
             &descriptors,
             &descriptor_bindings,
             &uniformbuffers,
-            &[&texture].repeat(3),
+            &[texture.as_ref()].repeat(3),
             &[&sampler].repeat(3),
         )?;
 
@@ -348,7 +353,7 @@ impl Renderer {
             set_layout,
             descriptor_pool,
             descriptors,
-            texture,
+            texture: Arc::clone(&texture),
             sampler,
         })
     }
@@ -361,6 +366,7 @@ impl Drop for Renderer {
                 "Failed to wait on device",
                 self.context.device.device_wait_idle()
             );
+
             for semaphore in &self.image_available_semaphores {
                 self.context.device.destroy_semaphore(*semaphore, None);
             }
