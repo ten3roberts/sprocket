@@ -77,7 +77,7 @@ impl Application {
         let mut timer = Timer::with_target(time::Duration::from_secs(5));
         while !self.windows.is_empty() {
             if cleanup_timer.signaled() {
-                self.resource_manager.as_ref().unwrap().cleanup();
+                self.resource_manager.as_ref().unwrap().cleanup(5); // Change to swapchain.image_count() in renderer system
                 cleanup_timer.restart();
             }
             if timer.signaled() {

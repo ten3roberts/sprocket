@@ -1,4 +1,4 @@
-use super::{super::SWAPCHAIN_IMAGE_COUNT, Model, Result, Texture, VulkanContext};
+use super::{Model, Result, Texture, VulkanContext};
 use ash::version::DeviceV1_0;
 use log::*;
 use std::{
@@ -121,12 +121,13 @@ impl ResourceManager {
     /// Will place each resource no longer used in a cleanup stack
     /// The actual resource will get deleted after SWAPCHAIN_IMAGE_COUNT cleanup cycles so that it is no longer in use by a pipeline
     /// Should only be called from one thread to avoid thread blocking
-    pub fn cleanup(&self) {
-        self.cleanup_textures();
-        self.cleanup_models();
+    /// garbage_cycles: After how many cycles garbage should assumed to no longer be in pipeline and can safely be discarded
+    pub fn cleanup(&self, garbage_cycles: u32) {
+        self.cleanup_textures(garbage_cycles);
+        self.cleanup_models(garbage_cycles);
     }
 
-    fn cleanup_textures(&self) {
+    fn cleanup_textures(&self, garbage_cycles: u32) {
         // Acquire a lock for the whole function to avoid having a resource getting a user midway through TOCTOU
         let mut garbage = self.texture_garbage.lock().unwrap();
         let mut textures = self.textures.write().unwrap();
@@ -139,7 +140,7 @@ impl ResourceManager {
         // Remove all elements with one 1 (self) strong reference and place into garbage
         textures.retain(|_, r| {
             if Arc::strong_count(&r) == 1 {
-                garbage.push(Garbage::new(Arc::clone(&r), SWAPCHAIN_IMAGE_COUNT));
+                garbage.push(Garbage::new(Arc::clone(&r), garbage_cycles));
                 false
             } else {
                 true
@@ -147,7 +148,7 @@ impl ResourceManager {
         });
     }
 
-    fn cleanup_models(&self) {
+    fn cleanup_models(&self, garbage_cycles: u32) {
         // Acquire a lock for the whole function to avoid having a resource getting a user midway through TOCTOU
         let mut garbage = self.model_garbage.lock().unwrap();
         let mut models = self.models.write().unwrap();
@@ -160,7 +161,7 @@ impl ResourceManager {
         // Remove all elements with one 1 (self) strong reference and place into garbage
         models.retain(|_, r| {
             if Arc::strong_count(&r) == 1 {
-                garbage.push(Garbage::new(Arc::clone(&r), SWAPCHAIN_IMAGE_COUNT));
+                garbage.push(Garbage::new(Arc::clone(&r), garbage_cycles));
                 false
             } else {
                 true

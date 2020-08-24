@@ -285,8 +285,8 @@ impl Renderer {
             &descriptors,
             &descriptor_bindings,
             &uniformbuffers,
-            &[texture.as_ref()].repeat(3),
-            &[&sampler].repeat(3),
+            &[texture.as_ref()].repeat(swapchain.image_count()),
+            &[&sampler].repeat(swapchain.image_count()),
         )?;
 
         let mut framebuffers = Vec::with_capacity(swapchain.image_count());

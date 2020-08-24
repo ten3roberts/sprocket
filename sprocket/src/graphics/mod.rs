@@ -9,8 +9,6 @@ pub mod window;
 
 pub use error::{Error, Result};
 
-const SWAPCHAIN_IMAGE_COUNT: u32 = 3;
-
 pub enum GraphicsContext {
     Vulkan(Arc<vulkan::VulkanContext>),
     OpenGL,

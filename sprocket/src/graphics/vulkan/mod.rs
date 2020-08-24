@@ -370,18 +370,11 @@ unsafe fn rate_device(
     }
 
     // Check adequate swapchain support
-    let (capabilities, formats, present_modes) =
+    let (_capabilities, formats, present_modes) =
         match Swapchain::query_support(device, surface_loader, surface) {
             Ok(v) => v,
             Err(_) => return 0,
         };
-
-    if capabilities.min_image_count > graphics::SWAPCHAIN_IMAGE_COUNT
-        || (capabilities.max_image_count != 0
-            && capabilities.max_image_count < graphics::SWAPCHAIN_IMAGE_COUNT)
-    {
-        return 0;
-    }
 
     if formats.is_empty() {
         return 0;

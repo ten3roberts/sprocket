@@ -34,13 +34,18 @@ impl Swapchain {
             let present_mode = Self::pick_present_mode(present_modes);
             let extent = Self::pick_extent(&capabilities, extent);
 
-            let image_count = graphics::SWAPCHAIN_IMAGE_COUNT;
+            debug!(
+                "Swapchain images: {}<>{}",
+                capabilities.min_image_count, capabilities.max_image_count
+            );
+
+            let min_image_count = 3;
 
             let swapchain_loader = ash::extensions::khr::Swapchain::new(instance, device);
 
             let mut create_info = vk::SwapchainCreateInfoKHR::builder()
                 .surface(*surface)
-                .min_image_count(image_count)
+                .min_image_count(min_image_count)
                 .image_color_space(format.color_space)
                 .image_format(format.format)
                 .image_extent(extent)
@@ -57,7 +62,7 @@ impl Swapchain {
                 queue_families.present.unwrap(),
             ];
 
-            if queue_families.graphics == queue_families.present {
+            if queue_families.graphics != queue_families.present {
                 debug!("Sharing mode concurrent");
                 create_info.image_sharing_mode = vk::SharingMode::CONCURRENT;
                 create_info.queue_family_index_count = 2;
@@ -72,6 +77,7 @@ impl Swapchain {
 
             // Create textures from the images in swapchain
             let images = swapchain_loader.get_swapchain_images(swapchain)?;
+            debug!("Swapchain image count: {}", images.len());
 
             let mut swapchain_images = Vec::with_capacity(images.len());
             for image in images {
