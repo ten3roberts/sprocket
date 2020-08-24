@@ -31,6 +31,17 @@ pub struct ResourceInfo {
     weak_refs: usize,
 }
 
+/// A trait for a resource that can be loaded from a path
+///
+/// Requires a load function
+pub trait Resource {
+    type Output;
+    /// Trait function used to load a function
+    /// Provides resourcemanager for access to e.g other resources and graphics context
+    /// Resource loading should not have many sideeffects and produce similar results when loaded several times from the same file
+    fn load(resourcemanager: &ResourceManager, path: &str) -> Self::Output;
+}
+
 /// Keeps track of loaded resources across threads
 /// Automatically reference counts resources and removes no longer used ones with .cleanup()
 pub struct ResourceManager {
@@ -55,6 +66,10 @@ impl ResourceManager {
         }
     }
 
+    pub fn context(&self) -> &Arc<VulkanContext> {
+        &self.context
+    }
+
     /// Loads and stores a texture if it doesn't already exist
     /// The texture will be stored as the path name
     /// If a texture with the name already exists, the existing one will be returned
@@ -65,13 +80,7 @@ impl ResourceManager {
                 .write()
                 .unwrap()
                 .entry(path.to_owned())
-                .or_insert(Arc::new(Texture::load(
-                    &self.context.allocator,
-                    &self.context.device,
-                    self.context.graphics_queue,
-                    self.context.generic_pool(),
-                    path,
-                )?)),
+                .or_insert(Arc::new(Texture::load(self, path)?)),
         ))
     }
 
@@ -97,13 +106,7 @@ impl ResourceManager {
         }
 
         // Load outside match to drop RwLock read guard
-        let model = Arc::new(Model::load(
-            path,
-            &self.context.allocator,
-            &self.context.device,
-            self.context.graphics_queue,
-            self.context.generic_pool(),
-        )?);
+        let model = Arc::new(Model::load(self, path)?);
 
         self.models
             .write()

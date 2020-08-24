@@ -1,4 +1,4 @@
-use super::{buffer, CommandBuffer, CommandPool, Error, Result, VkAllocator};
+use super::{buffer, resources::Resource, CommandBuffer, CommandPool, Error, Result, VkAllocator};
 use crate::graphics::Extent2D;
 use ash::version::DeviceV1_0;
 use ash::vk;
@@ -29,15 +29,16 @@ extern "C" {
     ) -> *mut u8;
 }
 
-impl Texture {
+impl Resource for Texture {
+    type Output = Result<Self>;
+
     // Load a texture from an image file on disk
-    pub fn load(
-        allocator: &VkAllocator,
-        device: &ash::Device,
-        queue: vk::Queue,
-        commandpool: &CommandPool,
-        path: &str,
-    ) -> Result<Texture> {
+    fn load(resourcemanager: &super::ResourceManager, path: &str) -> Self::Output {
+        let context = resourcemanager.context();
+        let allocator = &context.allocator;
+        let device = &context.device;
+        let queue = context.graphics_queue;
+        let commandpool = context.generic_pool();
         let filename = CString::new(path).expect("Failed to convert path into CString");
         let mut width = 0;
         let mut height = 0;
@@ -118,7 +119,9 @@ impl Texture {
         unsafe { Box::from_raw(pixels) };
         Ok(texture)
     }
+}
 
+impl Texture {
     // Creates a new empty image and image view with undefined dta
     pub fn new(
         allocator: &VkAllocator,

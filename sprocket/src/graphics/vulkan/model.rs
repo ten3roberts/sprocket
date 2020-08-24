@@ -1,21 +1,22 @@
-use super::{CommandPool, Error, Mesh, Result, Vertex, VkAllocator};
+use super::{resources::Resource, CommandPool, Error, Mesh, Result, Vertex, VkAllocator};
 use crate::math::*;
 use ash::{self, vk};
 use ex::fs;
-use std::{collections::HashMap, path::Path};
+use std::collections::HashMap;
 pub struct Model {
     meshes: HashMap<String, Mesh>,
 }
 
-impl Model {
+impl Resource for Model {
+    type Output = Result<Self>;
     // Loads a model from a collada file into meshes
-    pub fn load<P: AsRef<Path> + std::fmt::Display>(
-        path: P,
-        allocator: &VkAllocator,
-        device: &ash::Device,
-        queue: vk::Queue,
-        commandpool: &CommandPool,
-    ) -> Result<Model> {
+    fn load(resourcemanager: &super::ResourceManager, path: &str) -> Self::Output {
+        let context = resourcemanager.context();
+        let allocator = &context.allocator;
+        let device = &context.device;
+        let queue = context.graphics_queue;
+        let commandpool = context.generic_pool();
+
         let root = simple_xml::from_string(&fs::read_to_string(path)?)?;
         let lib_geometries = &root.try_get_nodes("library_geometries")?[0];
         let mut meshes = HashMap::new();
@@ -46,7 +47,9 @@ impl Model {
 
         Ok(Model { meshes })
     }
+}
 
+impl Model {
     pub fn get_mesh_index(&self, index: usize) -> Option<&Mesh> {
         self.meshes.iter().skip(index).next().map(|(_, v)| v)
     }
