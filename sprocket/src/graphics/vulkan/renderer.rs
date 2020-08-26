@@ -1,3 +1,4 @@
+use super::enums::*;
 use super::VulkanContext;
 use super::*;
 use crate::graphics::vulkan;
@@ -103,6 +104,7 @@ impl Renderer {
             model:
             // Mat4::rotate_z(self.frame_count as f32 / 30.0),
             Mat4::rotate_y(time.elapsed_f32())
+                * Mat4::translate(Vec3::new(0.0, 0.5 * time.elapsed_f32().sin(), 0.0))
             * Mat4::translate(Vec3::new(0.0, 0.0, -5.0)),
             view: Mat4::identity(),
             proj: Mat4::perspective(window.aspect(), 1.0, 0.1, 10.0),
@@ -198,8 +200,44 @@ impl Renderer {
             window.extent(),
         )?;
 
+        let renderpass_spec = RenderPassSpec {
+            subpasses: vec![Subpass {
+                color_attachments: vec![0],
+                depth_attachment: Some(1),
+            }],
+            dependencies: vec![SubpassDependency {
+                src_subpass: !0,
+                dst_subpass: 0,
+                src_stage: PipelineStage::ColorAttachmentOutput,
+                src_access: AccessFlags::None,
+                dst_stage: PipelineStage::ColorAttachmentOutput,
+                dst_access: AccessFlags::ColorAttachmentWrite,
+            }],
+            attachments: vec![
+                Attachment {
+                    format: ImageFormat::Color,
+                    final_layout: ImageLayout::PresentSrc,
+                    initial_layout: ImageLayout::Undefined,
+                    load_op: AttachmentLoadOp::DontCare,
+                    store_op: AttachmentStoreOp::Store,
+                    layout: ImageLayout::ColorAttachment,
+                    sample_count: 1,
+                },
+                Attachment {
+                    format: ImageFormat::Depth,
+                    final_layout: ImageLayout::DepthStencilAttachment,
+                    initial_layout: ImageLayout::Undefined,
+                    load_op: AttachmentLoadOp::Clear,
+                    store_op: AttachmentStoreOp::DontCare,
+                    layout: ImageLayout::DepthStencilAttachment,
+                    sample_count: 1,
+                },
+            ],
+        };
+
         let renderpass = RenderPass::new(
             &context.device,
+            renderpass_spec,
             swapchain.format(),
             swapchain.depth_image().format(),
         )?;

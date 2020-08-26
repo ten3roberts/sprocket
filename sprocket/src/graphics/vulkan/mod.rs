@@ -24,7 +24,9 @@ mod pipeline;
 pub use pipeline::Pipeline;
 
 mod renderpass;
-pub use renderpass::RenderPass;
+pub use renderpass::{
+    Attachment, ImageFormat, RenderPass, RenderPassSpec, Subpass, SubpassDependency,
+};
 
 mod framebuffer;
 use framebuffer::Framebuffer;
@@ -60,6 +62,8 @@ pub use super::{Error, Result};
 
 mod resources;
 pub use resources::ResourceManager;
+
+pub mod enums;
 
 pub type VkAllocator = Arc<RefCell<vk_mem::Allocator>>;
 

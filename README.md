@@ -7,6 +7,9 @@ Currently, not much is implemented
 ## The plan
 The plan for Sprocket is to be a powerful multi-threaded game engine for 2D as well as 3D
 
+### Types
+Many types have an additional type in the same module called {TYPE_NAME}Spec which is a serializable, non-context dependable representation of the resource. This is used to serialize and describe types in JSON
+
 ### Main features
 * Vulkan rendering
 * Multithreading with little to no blocking synchronization between different parts
