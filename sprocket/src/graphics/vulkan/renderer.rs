@@ -235,11 +235,16 @@ impl Renderer {
             ],
         };
 
+        log::debug!(
+            "RenderPass: {}",
+            serde_json::to_string_pretty(&renderpass_spec)?
+        );
+
         let renderpass = RenderPass::new(
             &context.device,
             renderpass_spec,
             swapchain.format(),
-            swapchain.depth_image().format(),
+            swapchain.depth_format(),
         )?;
 
         let pipeline_spec = pipeline::PipelineSpec {

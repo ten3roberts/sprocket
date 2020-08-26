@@ -107,6 +107,10 @@ impl Swapchain {
         self.format
     }
 
+    pub fn depth_format(&self) -> vk::Format {
+        self.depth_image.format()
+    }
+
     fn pick_format(formats: Vec<vk::SurfaceFormatKHR>) -> vk::SurfaceFormatKHR {
         for format in &formats {
             if format.format == vk::Format::B8G8R8A8_SRGB
