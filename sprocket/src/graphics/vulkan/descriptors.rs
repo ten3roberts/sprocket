@@ -2,7 +2,64 @@ use super::{Error, Result};
 use super::{Sampler, Texture, UniformBuffer};
 use ash::version::DeviceV1_0;
 use ash::vk;
+use serde::{Deserialize, Serialize};
 use std::ptr;
+
+#[derive(Serialize, Deserialize)]
+pub struct DescriptorSetLayoutBinding {
+    pub slot: u32,
+    pub ty: DescriptorType,
+    pub count: u32,
+    pub stages: Vec<ShaderStage>,
+}
+impl DescriptorSetLayoutBinding {
+    pub fn to_vk(&self) -> vk::DescriptorSetLayoutBinding {
+        vk::DescriptorSetLayoutBinding {
+            binding: self.slot,
+            descriptor_type: self.ty.into(),
+            descriptor_count: self.count,
+            stage_flags: vk::ShaderStageFlags::from_raw(
+                self.stages.iter().fold(0, |acc, val| acc | ((*val) as u32)),
+            ),
+            p_immutable_samplers: std::ptr::null(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Copy, Clone)]
+/// Represents a descriptor type
+/// Commented types are not yet implemented
+pub enum DescriptorType {
+    // Sampler= 0,
+    CombinedImageSampler = 1,
+    // SampledImage= 2,
+    // StorageImage= 3,
+    // UniformTexelBuffer= 4,
+    // StorageTexelBuffer= 5,
+    UniformBuffer = 6,
+    // StorageBuffer= 7,
+    // UniformBufferDynamic= 8,
+    // StorageBufferDynamic= 9,
+    // InputAttachment= 10,
+}
+
+impl From<DescriptorType> for vk::DescriptorType {
+    fn from(ty: DescriptorType) -> Self {
+        Self::from_raw(ty as i32)
+    }
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone)]
+pub enum ShaderStage {
+    Vertex = 0b1,
+    TessellationControl = 0b10,
+    TessellationEvaluation = 0b100,
+    Geometry = 0b1000,
+    Fragment = 0b1_0000,
+    Compute = 0b10_0000,
+    AllGraphics = 0x0000_001F,
+    All = 0x7FFF_FFFF,
+}
 
 pub struct DescriptorSetLayout {
     device: ash::Device,
@@ -10,8 +67,9 @@ pub struct DescriptorSetLayout {
 }
 
 impl DescriptorSetLayout {
-    pub fn new(device: &ash::Device, bindings: &[vk::DescriptorSetLayoutBinding]) -> Result<Self> {
-        let layout_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(bindings);
+    pub fn new(device: &ash::Device, bindings: &[DescriptorSetLayoutBinding]) -> Result<Self> {
+        let bindings: Vec<_> = bindings.iter().map(|binding| binding.to_vk()).collect();
+        let layout_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
         let layout = unsafe { device.create_descriptor_set_layout(&layout_info, None)? };
 
         Ok(DescriptorSetLayout {
@@ -94,7 +152,7 @@ impl DescriptorSet {
     pub fn write(
         device: &ash::Device,
         sets: &[DescriptorSet],
-        bindings: &[vk::DescriptorSetLayoutBinding],
+        bindings: &[DescriptorSetLayoutBinding],
         buffers: &[UniformBuffer],
         textures: &[&Texture],
         samplers: &[&Sampler],
@@ -102,13 +160,13 @@ impl DescriptorSet {
         // The number of uniform buffers specified in the bindings
         let ub_count = bindings
             .iter()
-            .filter(|binding| binding.descriptor_type == vk::DescriptorType::UNIFORM_BUFFER)
+            .filter(|binding| binding.ty == DescriptorType::UniformBuffer)
             .count()
             * sets.len();
 
         let image_count = bindings
             .iter()
-            .filter(|binding| binding.descriptor_type == vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .filter(|binding| binding.ty == DescriptorType::CombinedImageSampler)
             .count()
             * sets.len();
 
@@ -142,8 +200,8 @@ impl DescriptorSet {
 
         for set in sets {
             for binding in bindings {
-                match binding.descriptor_type {
-                    vk::DescriptorType::UNIFORM_BUFFER => {
+                match binding.ty {
+                    DescriptorType::UniformBuffer => {
                         let buffer = &buffers[buffer_infos.len()];
                         buffer_infos.push(vk::DescriptorBufferInfo {
                             buffer: buffer.buffer(),
@@ -154,7 +212,7 @@ impl DescriptorSet {
                         descriptor_writes.push(vk::WriteDescriptorSet {
                             s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
                             dst_set: set.set,
-                            dst_binding: binding.binding,
+                            dst_binding: binding.slot,
                             dst_array_element: 0,
                             descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
                             descriptor_count: 1,
@@ -164,7 +222,7 @@ impl DescriptorSet {
                             p_next: ptr::null(),
                         })
                     }
-                    vk::DescriptorType::COMBINED_IMAGE_SAMPLER => {
+                    DescriptorType::CombinedImageSampler => {
                         let texture = &textures[image_infos.len()];
                         image_infos.push(vk::DescriptorImageInfo {
                             image_layout: texture.layout(),
@@ -175,7 +233,7 @@ impl DescriptorSet {
                         descriptor_writes.push(vk::WriteDescriptorSet {
                             s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
                             dst_set: set.set,
-                            dst_binding: binding.binding,
+                            dst_binding: binding.slot,
                             dst_array_element: 0,
                             descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
                             descriptor_count: 1,
@@ -185,7 +243,6 @@ impl DescriptorSet {
                             p_next: ptr::null(),
                         })
                     }
-                    ty => return Err(Error::UnsupportedDescriptorType(ty)),
                 }
             }
         }

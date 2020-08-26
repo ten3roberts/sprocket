@@ -217,19 +217,17 @@ impl Renderer {
         }
 
         let descriptor_bindings = [
-            vk::DescriptorSetLayoutBinding {
-                binding: 0,
-                descriptor_count: 1,
-                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                p_immutable_samplers: std::ptr::null(),
-                stage_flags: vk::ShaderStageFlags::VERTEX,
+            DescriptorSetLayoutBinding {
+                slot: 0,
+                count: 1,
+                ty: DescriptorType::UniformBuffer,
+                stages: vec![ShaderStage::Vertex],
             },
-            vk::DescriptorSetLayoutBinding {
-                binding: 1,
-                descriptor_count: 1,
-                descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                p_immutable_samplers: std::ptr::null(),
-                stage_flags: vk::ShaderStageFlags::FRAGMENT,
+            DescriptorSetLayoutBinding {
+                slot: 1,
+                count: 1,
+                ty: DescriptorType::CombinedImageSampler,
+                stages: vec![ShaderStage::Fragment],
             },
         ];
 

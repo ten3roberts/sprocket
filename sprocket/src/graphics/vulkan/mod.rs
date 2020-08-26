@@ -49,7 +49,10 @@ pub use uniformbuffer::UniformBuffer;
 pub use uniformbuffer::UniformBufferObject;
 
 pub mod descriptors;
-pub use descriptors::{DescriptorPool, DescriptorSet, DescriptorSetLayout};
+pub use descriptors::{
+    DescriptorPool, DescriptorSet, DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorType,
+    ShaderStage,
+};
 
 pub mod mesh;
 pub use mesh::Mesh;

@@ -19,7 +19,6 @@ pub enum Error {
     NotRecording,
     MissingMemoryType(vk::MemoryPropertyFlags),
     MismatchedBinding(vk::DescriptorType, u32, u32),
-    UnsupportedDescriptorType(vk::DescriptorType),
     NoAllocator,
     UnsupportedTransition(vk::ImageLayout, vk::ImageLayout),
     XMLError(simple_xml::Error),
@@ -88,7 +87,6 @@ impl std::fmt::Display for Error {
                 write!(f, "Cannot find GPU memory type supporting {:?}", properties)
             }
             Error::MismatchedBinding(ty, binding_count, supplied_count) => write!(f, "Descriptor set bindings count do not match supplied count for {:?}. Expected {}, supplied {}", ty, binding_count, supplied_count),
-            Error::UnsupportedDescriptorType(ty) => write!(f, "Descriptor type {:?} is not supported", ty),
             Error::NoAllocator => write!(f, "The specified resource has no allocator associated with it"),
             Error::UnsupportedTransition(src, dst) => write!(f, "The image transition from {:?} to {:?} is not supported", src, dst),
             Error::XMLError(e) => write!(f, "Failed to read xml file {:?}", e),
