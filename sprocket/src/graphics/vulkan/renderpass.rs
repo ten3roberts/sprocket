@@ -1,4 +1,5 @@
 use super::enums::*;
+use super::resources::Resource;
 use super::Result;
 use ash::version::DeviceV1_0;
 use ash::vk;
@@ -21,9 +22,26 @@ pub struct Subpass {
 }
 
 #[derive(Serialize, Deserialize)]
+pub enum SubpassIndex {
+    /// The external pseudo subpass that happens at before or after evrything else depending if src or dst pass
+    /// In other words, specified the beginnings or ends
+    External,
+    Internal(u32),
+}
+
+impl From<SubpassIndex> for u32 {
+    fn from(index: SubpassIndex) -> Self {
+        match index {
+            SubpassIndex::External => vk::SUBPASS_EXTERNAL,
+            SubpassIndex::Internal(index) => index,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct SubpassDependency {
-    pub src_subpass: u32,
-    pub dst_subpass: u32,
+    pub src_subpass: SubpassIndex,
+    pub dst_subpass: SubpassIndex,
     pub src_stage: PipelineStage,
     pub dst_stage: PipelineStage,
     pub src_access: AccessFlags,
@@ -79,6 +97,26 @@ pub enum ImageFormat {
 pub struct RenderPass {
     device: ash::Device,
     renderpass: vk::RenderPass,
+}
+
+impl Resource for RenderPass {
+    fn load(resourcemanager: &super::ResourceManager, path: &str) -> Result<Self> {
+        let spec: RenderPassSpec = serde_json::from_str(&ex::fs::read_to_string(path)?)?;
+        let context = resourcemanager.context();
+        let swapchain = match resourcemanager.get_swapchain() {
+            Some(swapchain) => swapchain,
+            None => {
+                log::error!("Swapchain in resource manager is None");
+                panic!();
+            }
+        };
+        Self::new(
+            &context.device,
+            spec,
+            swapchain.format(),
+            swapchain.depth_format(),
+        )
+    }
 }
 
 impl RenderPass {
@@ -143,8 +181,14 @@ impl RenderPass {
             .dependencies
             .iter()
             .map(|dependency| vk::SubpassDependency {
-                src_subpass: dependency.src_subpass,
-                dst_subpass: dependency.dst_subpass,
+                src_subpass: match dependency.src_subpass {
+                    SubpassIndex::External => !0,
+                    SubpassIndex::Internal(i) => i,
+                },
+                dst_subpass: match dependency.dst_subpass {
+                    SubpassIndex::External => !0,
+                    SubpassIndex::Internal(i) => i,
+                },
                 src_stage_mask: dependency.src_stage.into(),
                 dst_stage_mask: dependency.dst_stage.into(),
                 src_access_mask: dependency.src_access.into(),

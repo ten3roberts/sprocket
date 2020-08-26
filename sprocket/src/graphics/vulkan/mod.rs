@@ -25,7 +25,7 @@ pub use pipeline::Pipeline;
 
 mod renderpass;
 pub use renderpass::{
-    Attachment, ImageFormat, RenderPass, RenderPassSpec, Subpass, SubpassDependency,
+    Attachment, ImageFormat, RenderPass, RenderPassSpec, Subpass, SubpassDependency, SubpassIndex,
 };
 
 mod framebuffer;

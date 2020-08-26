@@ -1,4 +1,4 @@
-use super::{Model, Result, Texture, VulkanContext};
+use super::{Model, RenderPass, Result, Swapchain, Texture, VulkanContext};
 use ash::version::DeviceV1_0;
 use log::*;
 use std::{
@@ -133,8 +133,11 @@ impl<T: Resource> ResourceSystem<T> {
 /// Automatically reference counts resources and removes no longer used ones with .cleanup()
 pub struct ResourceManager {
     context: Arc<VulkanContext>,
+    // The current swapchain
+    swapchain: RwLock<Option<Arc<Swapchain>>>,
     textures: ResourceSystem<Texture>,
     models: ResourceSystem<Model>,
+    renderpasses: ResourceSystem<RenderPass>,
 }
 
 impl ResourceManager {
@@ -145,6 +148,8 @@ impl ResourceManager {
             context,
             textures: ResourceSystem::new(),
             models: ResourceSystem::new(),
+            renderpasses: ResourceSystem::new(),
+            swapchain: RwLock::new(None),
         }
     }
 
@@ -152,10 +157,23 @@ impl ResourceManager {
         &self.context
     }
 
+    /// Sets the current swapchain
+    pub fn set_swapchain(&self, swapchain: Arc<Swapchain>) {
+        self.swapchain.write().unwrap().replace(swapchain);
+    }
+
+    /// Returns the currently set swapchain if any
+    pub fn get_swapchain(&self) -> Option<Arc<Swapchain>> {
+        self.swapchain
+            .read()
+            .unwrap()
+            .as_ref()
+            .map(|val| Arc::clone(val))
+    }
+
     /// Loads and stores a texture if it doesn't already exist
     /// The texture will be stored as the path name
     /// If a texture with the name already exists, the existing one will be returned
-    /// Will wait for write lock of textures
     pub fn load_texture(&self, path: &str) -> Result<Arc<Texture>> {
         self.textures.load(&self, path)
     }
@@ -169,7 +187,6 @@ impl ResourceManager {
     /// Loads and stores a model if it doesn't already exist
     /// The model will be stored as the path name
     /// If a model with the name already exists, the existing one will be returned
-    /// Will wait for write lock of textures
     /// Will not block for write access if model is already loaded
     pub fn load_model(&self, path: &str) -> Result<Arc<Model>> {
         self.models.load(self, path)
@@ -181,12 +198,26 @@ impl ResourceManager {
         self.models.get(path)
     }
 
+    /// Loads and stores a renderpass from json if it doesn't already exist
+    /// The renderpass will be stored as the path name
+    /// If a renderpass with the name already exists, the existing one will be returned
+    pub fn load_renderpass(&self, path: &str) -> Result<Arc<RenderPass>> {
+        self.renderpasses.load(self, path)
+    }
+
+    /// path to return a reference to an already loaded model
+    /// Returns None if the renderpass isn't loaded
+    pub fn get_renderpass(&self, path: &str) -> Option<Arc<RenderPass>> {
+        self.renderpasses.get(path)
+    }
+
     /// Will place each resource no longer used in a garbage list
     /// The actual resource will get deleted after garbage_cycles cleanup cycles so that it is no longer in use by a pipeline
     /// Should only be called from one thread to avoid thread blocking
     pub fn collect_garbage(&self, garbage_cycles: u32) {
         self.textures.collect_garbage(garbage_cycles);
         self.models.collect_garbage(garbage_cycles);
+        self.renderpasses.collect_garbage(garbage_cycles);
     }
 
     /// Returns a descripctive status about the resources currently managed
@@ -194,6 +225,7 @@ impl ResourceManager {
         let mut result = Vec::new();
         result.extend(self.textures.info());
         result.extend(self.models.info());
+        result.extend(self.renderpasses.info());
 
         result
     }

@@ -23,6 +23,7 @@ pub enum Error {
     NoAllocator,
     UnsupportedTransition(vk::ImageLayout, vk::ImageLayout),
     XMLError(simple_xml::Error),
+    JSONError(serde_json::Error),
     ParseError,
     UnimplementedFeature(&'static str),
 }
@@ -57,6 +58,12 @@ impl From<simple_xml::Error> for Error {
     }
 }
 
+impl From<serde_json::Error> for Error {
+    fn from(error: serde_json::Error) -> Self {
+        Error::JSONError(error)
+    }
+}
+
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -85,6 +92,7 @@ impl std::fmt::Display for Error {
             Error::NoAllocator => write!(f, "The specified resource has no allocator associated with it"),
             Error::UnsupportedTransition(src, dst) => write!(f, "The image transition from {:?} to {:?} is not supported", src, dst),
             Error::XMLError(e) => write!(f, "Failed to read xml file {:?}", e),
+            Error::JSONError(e) => write!(f, "Failed to parse json file {:?}", e),
             Error::ParseError => write!(f, "Failed to parse string into a type"),
             Error::UnimplementedFeature(e) => write!(f, "Feature {} is not yet implemented", e),
         }

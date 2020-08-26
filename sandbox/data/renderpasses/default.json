@@ -1,0 +1,43 @@
+{
+  "subpasses": [
+    {
+      "color_attachments": [
+        0
+      ],
+      "depth_attachment": 1
+    }
+  ],
+  "dependencies": [
+    {
+      "src_subpass": "External",
+      "dst_subpass": {
+        "Internal": 0
+      },
+      "src_stage": "ColorAttachmentOutput",
+      "dst_stage": "ColorAttachmentOutput",
+      "src_access": "None",
+      "dst_access": "ColorAttachmentWrite"
+    }
+  ],
+  "attachments": [
+    {
+      "store_op": "Store",
+      "load_op": "DontCare",
+      "initial_layout": "Undefined",
+      "final_layout": "PresentSrc",
+      "layout": "ColorAttachment",
+      "sample_count": 1,
+      "format": "Color"
+    },
+    {
+      "store_op": "DontCare",
+      "load_op": "Clear",
+      "initial_layout": "Undefined",
+      "final_layout": "DepthStencilAttachment",
+      "layout": "DepthStencilAttachment",
+      "sample_count": 1,
+      "format": "Depth"
+    }
+  ]
+}
+

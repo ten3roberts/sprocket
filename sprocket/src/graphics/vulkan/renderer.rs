@@ -1,4 +1,3 @@
-use super::enums::*;
 use super::VulkanContext;
 use super::*;
 use crate::graphics::vulkan;
@@ -20,8 +19,8 @@ pub struct Renderer {
 }
 
 struct Data {
-    swapchain: Swapchain,
-    renderpass: RenderPass,
+    swapchain: Arc<Swapchain>,
+    renderpass: Arc<RenderPass>,
     commandpool: CommandPool,
     commandbuffers: Vec<CommandBuffer>,
     pipeline: Pipeline,
@@ -189,7 +188,7 @@ impl Renderer {
         window: &Window,
         resourcemanager: &Arc<ResourceManager>,
     ) -> Result<Data> {
-        let swapchain = Swapchain::new(
+        let swapchain = Arc::new(Swapchain::new(
             &context.instance,
             &context.physical_device,
             &context.device,
@@ -198,54 +197,10 @@ impl Renderer {
             &context.surface,
             &context.queue_families,
             window.extent(),
-        )?;
+        )?);
+        resourcemanager.set_swapchain(Arc::clone(&swapchain));
 
-        let renderpass_spec = RenderPassSpec {
-            subpasses: vec![Subpass {
-                color_attachments: vec![0],
-                depth_attachment: Some(1),
-            }],
-            dependencies: vec![SubpassDependency {
-                src_subpass: !0,
-                dst_subpass: 0,
-                src_stage: PipelineStage::ColorAttachmentOutput,
-                src_access: AccessFlags::None,
-                dst_stage: PipelineStage::ColorAttachmentOutput,
-                dst_access: AccessFlags::ColorAttachmentWrite,
-            }],
-            attachments: vec![
-                Attachment {
-                    format: ImageFormat::Color,
-                    final_layout: ImageLayout::PresentSrc,
-                    initial_layout: ImageLayout::Undefined,
-                    load_op: AttachmentLoadOp::DontCare,
-                    store_op: AttachmentStoreOp::Store,
-                    layout: ImageLayout::ColorAttachment,
-                    sample_count: 1,
-                },
-                Attachment {
-                    format: ImageFormat::Depth,
-                    final_layout: ImageLayout::DepthStencilAttachment,
-                    initial_layout: ImageLayout::Undefined,
-                    load_op: AttachmentLoadOp::Clear,
-                    store_op: AttachmentStoreOp::DontCare,
-                    layout: ImageLayout::DepthStencilAttachment,
-                    sample_count: 1,
-                },
-            ],
-        };
-
-        log::debug!(
-            "RenderPass: {}",
-            serde_json::to_string_pretty(&renderpass_spec)?
-        );
-
-        let renderpass = RenderPass::new(
-            &context.device,
-            renderpass_spec,
-            swapchain.format(),
-            swapchain.depth_format(),
-        )?;
+        let renderpass = resourcemanager.load_renderpass("./data/renderpasses/default.json")?;
 
         let pipeline_spec = pipeline::PipelineSpec {
             vertex_shader: "./data/shaders/default.vert.spv".into(),
