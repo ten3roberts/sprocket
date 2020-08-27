@@ -22,7 +22,7 @@
   "attachments": [
     {
       "store_op": "Store",
-      "load_op": "DontCare",
+      "load_op": "Clear",
       "initial_layout": "Undefined",
       "final_layout": "PresentSrc",
       "layout": "ColorAttachment",
