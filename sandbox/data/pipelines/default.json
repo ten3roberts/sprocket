@@ -1,0 +1,28 @@
+{
+    "vertex_shader": "./data/shaders/default.vert.spv",
+    "fragment_shader": "./data/shaders/default.frag.spv",
+    "geometry_shader": "",
+    "renderpass": "./data/renderpasses/default.json",
+    "layouts": [
+        {
+       "bindings": [
+                {
+                    "slot": 0,
+                    "ty": "UniformBuffer",
+                    "count": 1,
+                    "stages": [
+                        "Vertex"
+                    ]
+                },
+                {
+                    "slot": 1,
+                    "ty": "CombinedImageSampler",
+                    "count": 1,
+                    "stages": [
+                        "Fragment"
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -1,4 +1,4 @@
-use super::{Model, RenderPass, Result, Swapchain, Texture, VulkanContext};
+use super::{Model, Pipeline, RenderPass, Result, Swapchain, Texture, VulkanContext};
 use ash::version::DeviceV1_0;
 use log::*;
 use std::{
@@ -138,6 +138,7 @@ pub struct ResourceManager {
     textures: ResourceSystem<Texture>,
     models: ResourceSystem<Model>,
     renderpasses: ResourceSystem<RenderPass>,
+    pipelines: ResourceSystem<Pipeline>,
 }
 
 impl ResourceManager {
@@ -148,8 +149,9 @@ impl ResourceManager {
             context,
             textures: ResourceSystem::new(),
             models: ResourceSystem::new(),
-            renderpasses: ResourceSystem::new(),
             swapchain: RwLock::new(None),
+            renderpasses: ResourceSystem::new(),
+            pipelines: ResourceSystem::new(),
         }
     }
 
@@ -206,6 +208,19 @@ impl ResourceManager {
     }
 
     /// path to return a reference to an already loaded model
+    /// Returns None if the model isn't loaded
+    pub fn get_pipeline(&self, path: &str) -> Option<Arc<Pipeline>> {
+        self.pipelines.get(path)
+    }
+
+    /// Loads and stores a renderpass from json if it doesn't already exist
+    /// The renderpass will be stored as the path name
+    /// If a renderpass with the name already exists, the existing one will be returned
+    pub fn load_pipeline(&self, path: &str) -> Result<Arc<Pipeline>> {
+        self.pipelines.load(&self, path)
+    }
+
+    /// path to return a reference to an already loaded model
     /// Returns None if the renderpass isn't loaded
     pub fn get_renderpass(&self, path: &str) -> Option<Arc<RenderPass>> {
         self.renderpasses.get(path)
@@ -218,6 +233,7 @@ impl ResourceManager {
         self.textures.collect_garbage(garbage_cycles);
         self.models.collect_garbage(garbage_cycles);
         self.renderpasses.collect_garbage(garbage_cycles);
+        self.pipelines.collect_garbage(garbage_cycles);
     }
 
     /// Returns a descripctive status about the resources currently managed

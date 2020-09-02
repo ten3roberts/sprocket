@@ -23,11 +23,10 @@ struct Data {
     renderpass: Arc<RenderPass>,
     commandpool: CommandPool,
     commandbuffers: Vec<CommandBuffer>,
-    pipeline: Pipeline,
+    pipeline: Arc<Pipeline>,
     framebuffers: Vec<Framebuffer>,
     model: Arc<Model>,
     uniformbuffers: Vec<UniformBuffer>,
-    set_layout: DescriptorSetLayout,
     descriptor_pool: DescriptorPool,
     descriptors: Vec<DescriptorSet>,
     texture: Arc<Texture>,
@@ -77,7 +76,6 @@ impl Renderer {
         vulkan::wait_for_fences(device, &[self.in_flight_fences[self.current_frame]], true);
 
         // Update uniform buffer for this frame
-
         let (image_index, suboptimal) = match self
             .data
             .swapchain
@@ -198,15 +196,12 @@ impl Renderer {
             &context.queue_families,
             window.extent(),
         )?);
+
         resourcemanager.set_swapchain(Arc::clone(&swapchain));
 
         let renderpass = resourcemanager.load_renderpass("./data/renderpasses/default.json")?;
 
-        let pipeline_spec = pipeline::PipelineSpec {
-            vertex_shader: "./data/shaders/default.vert.spv".into(),
-            fragment_shader: "./data/shaders/default.frag.spv".into(),
-            geometry_shader: "".into(),
-        };
+        let pipeline = resourcemanager.load_pipeline("./data/pipelines/default.json")?;
 
         let mut uniformbuffers = Vec::new();
         for _ in 0..swapchain.image_count() {
@@ -215,23 +210,6 @@ impl Renderer {
                 std::mem::size_of::<UniformBufferObject>() as u64,
             )?);
         }
-
-        let descriptor_bindings = [
-            DescriptorSetLayoutBinding {
-                slot: 0,
-                count: 1,
-                ty: DescriptorType::UniformBuffer,
-                stages: vec![ShaderStage::Vertex],
-            },
-            DescriptorSetLayoutBinding {
-                slot: 1,
-                count: 1,
-                ty: DescriptorType::CombinedImageSampler,
-                stages: vec![ShaderStage::Fragment],
-            },
-        ];
-
-        let set_layout = DescriptorSetLayout::new(&context.device, &descriptor_bindings)?;
 
         let descriptor_pool = DescriptorPool::new(
             &context.device,
@@ -252,16 +230,8 @@ impl Renderer {
         let descriptors = DescriptorSet::new(
             &context.device,
             &descriptor_pool,
-            &set_layout,
+            &pipeline.set_layouts()[0],
             swapchain.image_count() as u32,
-        )?;
-
-        let pipeline = Pipeline::new(
-            &context.device,
-            pipeline_spec,
-            window.extent(),
-            &renderpass,
-            &[&set_layout],
         )?;
 
         let commandpool = CommandPool::new(
@@ -279,7 +249,7 @@ impl Renderer {
         DescriptorSet::write(
             &context.device,
             &descriptors,
-            &descriptor_bindings,
+            &pipeline.set_layouts()[0].spec(),
             &uniformbuffers,
             &[texture.as_ref()].repeat(swapchain.image_count()),
             &[&sampler].repeat(swapchain.image_count()),
@@ -342,7 +312,6 @@ impl Renderer {
             framebuffers,
             model,
             uniformbuffers,
-            set_layout,
             descriptor_pool,
             descriptors,
             texture: Arc::clone(&texture),

@@ -1,24 +1,42 @@
 use super::vertexbuffer::Vertex;
-use super::DescriptorSetLayout;
-use super::RenderPass;
+use super::{resources::Resource, DescriptorSetLayout, DescriptorSetLayoutSpec, Error, Result};
+
 use crate::graphics::Extent2D;
 use ash::version::DeviceV1_0;
 use ash::vk;
 use ex::fs;
+use serde::{Deserialize, Serialize};
 use std::ffi::CStr;
 
-use super::{Error, Result};
-
+#[derive(Serialize, Deserialize)]
 pub struct PipelineSpec {
     pub vertex_shader: String,
     pub fragment_shader: String,
     pub geometry_shader: String,
+    pub renderpass: String,
+    pub layouts: Vec<DescriptorSetLayoutSpec>,
 }
 
 pub struct Pipeline {
     device: ash::Device,
     layout: vk::PipelineLayout,
+    set_layouts: Vec<DescriptorSetLayout>,
     pipeline: vk::Pipeline,
+}
+
+impl Resource for Pipeline {
+    fn load(resourcemanager: &super::ResourceManager, path: &str) -> Result<Self> {
+        let spec: PipelineSpec = serde_json::from_str(&ex::fs::read_to_string(path)?)?;
+        let context = resourcemanager.context();
+        let swapchain = resourcemanager.get_swapchain();
+
+        Self::new(
+            &context.device,
+            spec,
+            swapchain.unwrap().extent(),
+            resourcemanager,
+        )
+    }
 }
 
 impl Pipeline {
@@ -26,8 +44,7 @@ impl Pipeline {
         device: &ash::Device,
         spec: PipelineSpec,
         extent: Extent2D,
-        renderpass: &RenderPass,
-        set_layouts: &[&DescriptorSetLayout],
+        resourcemanager: &super::ResourceManager,
     ) -> Result<Self> {
         let shader_entry_point = unsafe { CStr::from_ptr("main\0".as_ptr() as _) };
 
@@ -156,14 +173,23 @@ impl Pipeline {
         //     vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_states);
 
         // Pipeline layout
-        let set_layouts: Vec<vk::DescriptorSetLayout> =
+        let mut set_layouts = Vec::with_capacity(spec.layouts.len());
+
+        for layout_spec in spec.layouts {
+            set_layouts.push(DescriptorSetLayout::new(device, layout_spec)?)
+        }
+
+        let vk_set_layouts: Vec<vk::DescriptorSetLayout> =
             set_layouts.iter().map(|layout| layout.vk()).collect();
+
         let pipeline_layout_info = vk::PipelineLayoutCreateInfo::builder()
-            .set_layouts(&set_layouts)
+            .set_layouts(&vk_set_layouts)
             .push_constant_ranges(&[]);
 
         let pipeline_layout =
             unsafe { device.create_pipeline_layout(&pipeline_layout_info, None)? };
+
+        let renderpass = resourcemanager.load_renderpass(&spec.renderpass)?;
 
         let pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
             .stages(&shader_stages)
@@ -197,6 +223,7 @@ impl Pipeline {
             device: device.clone(),
             layout: pipeline_layout,
             pipeline,
+            set_layouts,
         })
     }
 
@@ -206,6 +233,10 @@ impl Pipeline {
 
     pub fn layout(&self) -> vk::PipelineLayout {
         self.layout
+    }
+
+    pub fn set_layouts(&self) -> &[DescriptorSetLayout] {
+        &self.set_layouts[..]
     }
 }
 

@@ -134,7 +134,7 @@ fn parse_collada_geometry(
             }
         });
     }
-
+    log::debug!("Vertex count: {}", vertices.len());
     Mesh::new(allocator, device, queue, commandpool, &vertices, &indices)
         .map(|mesh| (name.to_owned(), mesh))
 }

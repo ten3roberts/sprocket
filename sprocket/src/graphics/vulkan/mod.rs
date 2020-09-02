@@ -21,7 +21,7 @@ mod swapchain;
 use swapchain::Swapchain;
 
 mod pipeline;
-pub use pipeline::Pipeline;
+pub use pipeline::{Pipeline, PipelineSpec};
 
 mod renderpass;
 pub use renderpass::{
@@ -50,8 +50,8 @@ pub use uniformbuffer::UniformBufferObject;
 
 pub mod descriptors;
 pub use descriptors::{
-    DescriptorPool, DescriptorSet, DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorType,
-    ShaderStage,
+    DescriptorPool, DescriptorSet, DescriptorSetLayout, DescriptorSetLayoutBinding,
+    DescriptorSetLayoutSpec, DescriptorType, ShaderStage,
 };
 
 pub mod mesh;

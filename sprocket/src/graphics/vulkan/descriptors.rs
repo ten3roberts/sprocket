@@ -5,13 +5,19 @@ use ash::vk;
 use serde::{Deserialize, Serialize};
 use std::ptr;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Eq, PartialEq)]
+pub struct DescriptorSetLayoutSpec {
+    pub bindings: Vec<DescriptorSetLayoutBinding>,
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq)]
 pub struct DescriptorSetLayoutBinding {
     pub slot: u32,
     pub ty: DescriptorType,
     pub count: u32,
     pub stages: Vec<ShaderStage>,
 }
+
 impl DescriptorSetLayoutBinding {
     pub fn to_vk(&self) -> vk::DescriptorSetLayoutBinding {
         vk::DescriptorSetLayoutBinding {
@@ -26,7 +32,7 @@ impl DescriptorSetLayoutBinding {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Copy, Clone)]
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq)]
 /// Represents a descriptor type
 /// Commented types are not yet implemented
 pub enum DescriptorType {
@@ -49,7 +55,7 @@ impl From<DescriptorType> for vk::DescriptorType {
     }
 }
 
-#[derive(Serialize, Deserialize, Copy, Clone)]
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq)]
 pub enum ShaderStage {
     Vertex = 0b1,
     TessellationControl = 0b10,
@@ -64,22 +70,36 @@ pub enum ShaderStage {
 pub struct DescriptorSetLayout {
     device: ash::Device,
     layout: vk::DescriptorSetLayout,
+    spec: DescriptorSetLayoutSpec,
 }
 
 impl DescriptorSetLayout {
-    pub fn new(device: &ash::Device, bindings: &[DescriptorSetLayoutBinding]) -> Result<Self> {
-        let bindings: Vec<_> = bindings.iter().map(|binding| binding.to_vk()).collect();
+    /// Creates a new descriptorset layout
+    /// The spec is saved into the structure and can be retrieved with .spec()
+    /// Useful for creating descriptor sets from it
+    pub fn new(device: &ash::Device, spec: DescriptorSetLayoutSpec) -> Result<Self> {
+        let bindings: Vec<_> = spec
+            .bindings
+            .iter()
+            .map(|binding| binding.to_vk())
+            .collect();
         let layout_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
         let layout = unsafe { device.create_descriptor_set_layout(&layout_info, None)? };
 
         Ok(DescriptorSetLayout {
             device: device.clone(),
+            spec,
             layout,
         })
     }
 
     pub fn vk(&self) -> vk::DescriptorSetLayout {
         self.layout
+    }
+
+    /// Returns the specification that was used to create the descriptor set layout
+    pub fn spec(&self) -> &DescriptorSetLayoutSpec {
+        &self.spec
     }
 }
 
@@ -152,11 +172,12 @@ impl DescriptorSet {
     pub fn write(
         device: &ash::Device,
         sets: &[DescriptorSet],
-        bindings: &[DescriptorSetLayoutBinding],
+        spec: &DescriptorSetLayoutSpec,
         buffers: &[UniformBuffer],
         textures: &[&Texture],
         samplers: &[&Sampler],
     ) -> Result<()> {
+        let bindings = &spec.bindings;
         // The number of uniform buffers specified in the bindings
         let ub_count = bindings
             .iter()
