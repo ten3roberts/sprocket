@@ -236,6 +236,47 @@ impl ResourceManager {
         self.pipelines.collect_garbage(garbage_cycles);
     }
 
+    pub fn recreate(&self) -> Result<()> {
+        log::debug!("Start");
+        let swapchain = self.swapchain.read().unwrap();
+        let swapchain = swapchain.as_ref().unwrap();
+
+        let color_format = swapchain.format();
+        let depth_format = swapchain.depth_format();
+
+        // Separate into separate scopes to drop Write lock
+        {
+            let mut renderpasses = self.renderpasses.resources.write().unwrap();
+
+            let new_renderpasses: HashMap<_, _> = renderpasses
+                .iter()
+                .map(|(k, v)| match v.recreate(color_format, depth_format) {
+                    Ok(v) => Ok((k.to_owned(), Arc::new(v))),
+                    Err(e) => Err(e),
+                })
+                .collect::<Result<HashMap<_, _>>>()?;
+
+            // Replace the old with the new
+            let _ = std::mem::replace(&mut *renderpasses, new_renderpasses);
+        }
+        {
+            let mut pipelines = self.pipelines.resources.write().unwrap();
+            // Now recreate the pipelines
+            // They will query self for the renderpasses which are now replaced
+            let new_pipelines: HashMap<_, _> = pipelines
+                .iter()
+                .map(|(k, v)| match v.recreate(&self) {
+                    Ok(v) => Ok((k.to_owned(), Arc::new(v))),
+                    Err(e) => Err(e),
+                })
+                .collect::<Result<HashMap<_, _>>>()?;
+
+            let _ = std::mem::replace(&mut *pipelines, new_pipelines);
+        }
+
+        Ok(())
+    }
+
     /// Returns a descripctive status about the resources currently managed
     pub fn info(&self) -> Vec<ResourceInfo> {
         let mut result = Vec::new();

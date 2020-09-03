@@ -5,12 +5,12 @@ use ash::vk;
 use serde::{Deserialize, Serialize};
 use std::ptr;
 
-#[derive(Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub struct DescriptorSetLayoutSpec {
     pub bindings: Vec<DescriptorSetLayoutBinding>,
 }
 
-#[derive(Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub struct DescriptorSetLayoutBinding {
     pub slot: u32,
     pub ty: DescriptorType,

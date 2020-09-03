@@ -5,7 +5,7 @@ use ash::version::DeviceV1_0;
 use ash::vk;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 /// Specifies how to create a renderpass
 pub struct RenderPassSpec {
     pub subpasses: Vec<Subpass>,
@@ -15,13 +15,13 @@ pub struct RenderPassSpec {
     pub attachments: Vec<Attachment>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Subpass {
     pub color_attachments: Vec<usize>,
     pub depth_attachment: Option<usize>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum SubpassIndex {
     /// The external pseudo subpass that happens at before or after evrything else depending if src or dst pass
     /// In other words, specified the beginnings or ends
@@ -38,7 +38,7 @@ impl From<SubpassIndex> for u32 {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SubpassDependency {
     pub src_subpass: SubpassIndex,
     pub dst_subpass: SubpassIndex,
@@ -48,7 +48,7 @@ pub struct SubpassDependency {
     pub dst_access: AccessFlags,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 /// Describes an attachment in a renderpass
 /// Also describes information in AttachmentReference like layout, but not index
 /// The order in RenderPassSpec describes the attachments index
@@ -97,6 +97,7 @@ pub enum ImageFormat {
 pub struct RenderPass {
     device: ash::Device,
     renderpass: vk::RenderPass,
+    spec: RenderPassSpec,
 }
 
 impl Resource for RenderPass {
@@ -207,12 +208,23 @@ impl RenderPass {
         Ok(RenderPass {
             device: device.clone(),
             renderpass,
+            spec,
         })
     }
 
     // Returns the internal vulkan renderpass
     pub fn vk(&self) -> vk::RenderPass {
         self.renderpass
+    }
+
+    /// Returns self created again from spec but with updated values
+    /// Called when swapchain is recreated
+    pub fn recreate(
+        &self,
+        color_format: vk::Format,
+        depth_format: vk::Format,
+    ) -> Result<RenderPass> {
+        Self::new(&self.device, self.spec.clone(), color_format, depth_format)
     }
 }
 

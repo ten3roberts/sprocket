@@ -1,14 +1,13 @@
 use super::vertexbuffer::Vertex;
 use super::{resources::Resource, DescriptorSetLayout, DescriptorSetLayoutSpec, Error, Result};
 
-use crate::graphics::Extent2D;
 use ash::version::DeviceV1_0;
 use ash::vk;
 use ex::fs;
 use serde::{Deserialize, Serialize};
 use std::ffi::CStr;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct PipelineSpec {
     pub vertex_shader: String,
     pub fragment_shader: String,
@@ -22,20 +21,15 @@ pub struct Pipeline {
     layout: vk::PipelineLayout,
     set_layouts: Vec<DescriptorSetLayout>,
     pipeline: vk::Pipeline,
+    spec: PipelineSpec,
 }
 
 impl Resource for Pipeline {
     fn load(resourcemanager: &super::ResourceManager, path: &str) -> Result<Self> {
         let spec: PipelineSpec = serde_json::from_str(&ex::fs::read_to_string(path)?)?;
         let context = resourcemanager.context();
-        let swapchain = resourcemanager.get_swapchain();
 
-        Self::new(
-            &context.device,
-            spec,
-            swapchain.unwrap().extent(),
-            resourcemanager,
-        )
+        Self::new(&context.device, spec, resourcemanager)
     }
 }
 
@@ -43,7 +37,6 @@ impl Pipeline {
     pub fn new(
         device: &ash::Device,
         spec: PipelineSpec,
-        extent: Extent2D,
         resourcemanager: &super::ResourceManager,
     ) -> Result<Self> {
         let shader_entry_point = unsafe { CStr::from_ptr("main\0".as_ptr() as _) };
@@ -78,6 +71,8 @@ impl Pipeline {
         let input_assembly = vk::PipelineInputAssemblyStateCreateInfo::builder()
             .topology(vk::PrimitiveTopology::TRIANGLE_LIST)
             .primitive_restart_enable(false);
+
+        let extent = resourcemanager.get_swapchain().unwrap().extent();
 
         // Viewports and scissors
         let viewports = [vk::Viewport {
@@ -175,8 +170,9 @@ impl Pipeline {
         // Pipeline layout
         let mut set_layouts = Vec::with_capacity(spec.layouts.len());
 
-        for layout_spec in spec.layouts {
-            set_layouts.push(DescriptorSetLayout::new(device, layout_spec)?)
+        for layout_spec in &spec.layouts {
+            // TODO avoid clone
+            set_layouts.push(DescriptorSetLayout::new(device, layout_spec.clone())?)
         }
 
         let vk_set_layouts: Vec<vk::DescriptorSetLayout> =
@@ -224,6 +220,7 @@ impl Pipeline {
             layout: pipeline_layout,
             pipeline,
             set_layouts,
+            spec,
         })
     }
 
@@ -237,6 +234,12 @@ impl Pipeline {
 
     pub fn set_layouts(&self) -> &[DescriptorSetLayout] {
         &self.set_layouts[..]
+    }
+
+    /// Returns self created again from spec but with updated values
+    /// Called when swapchain is recreated
+    pub fn recreate(&self, resourcemanager: &super::ResourceManager) -> Result<Pipeline> {
+        Self::new(&self.device, self.spec.clone(), resourcemanager)
     }
 }
 
