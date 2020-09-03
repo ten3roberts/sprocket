@@ -1,0 +1,17 @@
+Graphics:
+    - Material
+    - Proper renderer
+    - 
+Systems:
+    - Desc: 
+      Introduce systems that run asynchronously on different threads
+      Entities are defined by several components that have the same entity
+      Each system has its own entities
+      When a change is made, it is sent across a channel as an event to the application, which then relays it to each  other system that subscribed for that event
+    - Renderer:
+      Stores mesh, material, and uniform data
+      Relies on Subsystems to update the uniform data for each entity
+
+    - Physics:
+      Does all physics calculations
+      Sends changed entities via a channel to the application that then relays it to the renderer which updates the position
