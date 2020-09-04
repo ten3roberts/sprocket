@@ -15,3 +15,23 @@ Systems:
     - Physics:
       Does all physics calculations
       Sends changed entities via a channel to the application that then relays it to the renderer which updates the position
+
+Systems:
+    - Each component is only data and can exist simultaneously on different threads
+    - When a component needs some other component it is pulled from the system
+    - If it is mutated a dirty flag is set
+    - At the end of a systems tick, all dirty components are sent across a channel to the application
+    - The application relays the changed components to all other systems
+    - Examples:
+        - Script in physics system requests a Text component by a handle as mutable
+        - The system returns the text component stored locally, or None
+        - The system sets a dirty bit for the component
+        - The script changes the text stored in the Text component
+        - The system tick ends
+        - System sends the new Text object along with other mutated components in a channel to application
+        - The application gets the message and sends it to the renderer system
+        - The renderer receives the new Text object and replaces the old one
+        - The renderer does a tick and calls update on the Text object, which returns a Mesh to display
+
+Bugs:
+    - vkDeviceWaitIdle locks on repeated calls when resizing several times in a frame. Only happens on Linux with Nvidia
