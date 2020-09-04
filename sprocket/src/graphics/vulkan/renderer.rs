@@ -175,16 +175,16 @@ impl Renderer {
             );
         }
 
+        log::info!("Recreating resource manager");
+        match self.resourcemanager.recreate() {
+            Ok(_) => {}
+            Err(e) => log::error!("Failed to recreate resource manager: {}", e),
+        };
+
         self.data = iferr!(
             "Failed to recreate renderer",
             Self::create_data(&self.context, window, &self.resourcemanager)
         );
-
-        log::info!("Recreating resource manager");
-        match self.resourcemanager.recreate() {
-            Ok(_) => {}
-            Err(e) => {log::error!("Failed to recreate resource manager: {}", e)}
-        };
     }
 
     fn create_data(
