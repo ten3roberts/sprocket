@@ -25,6 +25,7 @@ pub enum Error {
     JSONError(serde_json::Error),
     ParseError,
     UnimplementedFeature(&'static str),
+    MissingDescriptorSet(u32),
 }
 
 impl From<vk::Result> for Error {
@@ -93,6 +94,7 @@ impl std::fmt::Display for Error {
             Error::JSONError(e) => write!(f, "Failed to parse json file {:?}", e),
             Error::ParseError => write!(f, "Failed to parse string into a type"),
             Error::UnimplementedFeature(e) => write!(f, "Feature {} is not yet implemented", e),
+            Error::MissingDescriptorSet(set_index) => write!(f, "Missing required descriptor set {}", set_index),
         }
     }
 }

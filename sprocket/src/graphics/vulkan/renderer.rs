@@ -20,17 +20,14 @@ pub struct Renderer {
 
 struct Data {
     swapchain: Arc<Swapchain>,
-    renderpass: Arc<RenderPass>,
     commandpool: CommandPool,
     commandbuffers: Vec<CommandBuffer>,
-    pipeline: Arc<Pipeline>,
     framebuffers: Vec<Framebuffer>,
+    material: Arc<Material>,
     model: Arc<Model>,
     uniformbuffers: Vec<UniformBuffer>,
     descriptor_pool: DescriptorPool,
-    descriptors: Vec<DescriptorSet>,
-    texture: Arc<Texture>,
-    sampler: Sampler,
+    global_descriptors: Vec<DescriptorSet>,
 }
 
 impl Renderer {
@@ -207,8 +204,16 @@ impl Renderer {
 
         let renderpass = resourcemanager.load_renderpass("./data/renderpasses/default.json")?;
 
-        let pipeline = resourcemanager.load_pipeline("./data/pipelines/default.json")?;
-
+        let global_descriptor_layout_spec = DescriptorSetLayoutSpec {
+            bindings: vec![DescriptorSetLayoutBinding {
+                slot: 0,
+                ty: DescriptorType::UniformBuffer,
+                count: 1,
+                stages: vec![ShaderStage::Vertex],
+            }],
+        };
+        let global_descriptor_layout =
+            DescriptorSetLayout::new(&context.device, global_descriptor_layout_spec)?;
         let mut uniformbuffers = Vec::new();
         for _ in 0..swapchain.image_count() {
             uniformbuffers.push(UniformBuffer::new(
@@ -219,25 +224,29 @@ impl Renderer {
 
         let descriptor_pool = DescriptorPool::new(
             &context.device,
-            &[
-                vk::DescriptorPoolSize {
-                    descriptor_count: swapchain.image_count() as u32,
-                    ty: vk::DescriptorType::UNIFORM_BUFFER,
-                },
-                vk::DescriptorPoolSize {
-                    descriptor_count: swapchain.image_count() as u32,
-                    ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                },
-            ],
+            &[vk::DescriptorPoolSize {
+                descriptor_count: swapchain.image_count() as u32,
+                ty: vk::DescriptorType::UNIFORM_BUFFER,
+            }],
             swapchain.image_count() as u32,
         )?;
 
         // Create descriptor set for mvp data
-        let descriptors = DescriptorSet::new(
+        let global_descriptors = DescriptorSet::new(
             &context.device,
             &descriptor_pool,
-            &pipeline.set_layouts()[0],
+            &global_descriptor_layout,
             swapchain.image_count() as u32,
+        )?;
+
+        // Write global descriptors
+        DescriptorSet::write(
+            &context.device,
+            &global_descriptors,
+            &global_descriptor_layout.spec(),
+            uniformbuffers.iter(),
+            [].iter(),
+            [].iter(),
         )?;
 
         let commandpool = CommandPool::new(
@@ -247,19 +256,7 @@ impl Renderer {
             false,
         )?;
 
-        // This will be cleaned up
-        let _texture = resourcemanager.load_texture("./data/textures/color_grid.png")?;
-        let texture = resourcemanager.load_texture("./data/textures/grid.png")?;
-        let sampler = Sampler::new(&context.device)?;
-
-        DescriptorSet::write(
-            &context.device,
-            &descriptors,
-            &pipeline.set_layouts()[0].spec(),
-            &uniformbuffers,
-            &[texture.as_ref()].repeat(swapchain.image_count()),
-            &[&sampler].repeat(swapchain.image_count()),
-        )?;
+        let material = resourcemanager.load_material("./data/materials/default.json")?;
 
         let mut framebuffers = Vec::with_capacity(swapchain.image_count());
         for i in 0..swapchain.image_count() {
@@ -274,26 +271,10 @@ impl Renderer {
         let mut commandbuffers =
             CommandBuffer::new_primary(&context.device, &commandpool, swapchain.image_count())?;
 
-        let _model = resourcemanager.load_model("./data/models/cube.dae")?;
         let model = resourcemanager.load_model("./data/models/suzanne.dae")?;
 
         let mesh = model.get_mesh_index(0).unwrap();
-        // let mesh = Mesh::new(
-        //     &context.allocator,
-        //     &context.device,
-        //     context.graphics_queue,
-        //     &commandpool,
-        //     &vertices,
-        //     &indices,
-        // )?;
 
-        // info!(
-        //     "Mesh: v count: {},i count: {}",
-        //     mesh.vertex_count(),
-        //     mesh.index_count()
-        // );
-
-        // Prerecord commandbuffers
         for (i, commandbuffer) in commandbuffers.iter_mut().enumerate() {
             commandbuffer.begin(Default::default())?;
             commandbuffer.begin_renderpass(
@@ -301,8 +282,7 @@ impl Renderer {
                 &framebuffers[i],
                 math::Vec4::new(0.0, 0.0, 0.01, 1.0),
             );
-            commandbuffer.bind_pipeline(&pipeline);
-            commandbuffer.bind_descriptorsets(&pipeline, &[&descriptors[i]]);
+            commandbuffer.bind_material(&material, &global_descriptors[i], i as u32);
             commandbuffer.bind_mesh(mesh);
             commandbuffer.draw_indexed(mesh.index_count());
             commandbuffer.end_renderpass();
@@ -311,17 +291,14 @@ impl Renderer {
 
         Ok(Data {
             swapchain,
-            renderpass,
             commandpool,
             commandbuffers,
-            pipeline,
             framebuffers,
             model,
+            material,
             uniformbuffers,
             descriptor_pool,
-            descriptors,
-            texture: Arc::clone(&texture),
-            sampler,
+            global_descriptors,
         })
     }
 }

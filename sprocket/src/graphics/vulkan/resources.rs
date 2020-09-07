@@ -1,4 +1,4 @@
-use super::{Model, Pipeline, RenderPass, Result, Swapchain, Texture, VulkanContext};
+use super::{Material, Model, Pipeline, RenderPass, Result, Swapchain, Texture, VulkanContext};
 use ash::version::DeviceV1_0;
 use log::*;
 use std::{
@@ -139,6 +139,7 @@ pub struct ResourceManager {
     models: ResourceSystem<Model>,
     renderpasses: ResourceSystem<RenderPass>,
     pipelines: ResourceSystem<Pipeline>,
+    materials: ResourceSystem<Material>,
 }
 
 impl ResourceManager {
@@ -152,6 +153,7 @@ impl ResourceManager {
             swapchain: RwLock::new(None),
             renderpasses: ResourceSystem::new(),
             pipelines: ResourceSystem::new(),
+            materials: ResourceSystem::new(),
         }
     }
 
@@ -200,13 +202,6 @@ impl ResourceManager {
         self.models.get(path)
     }
 
-    /// Loads and stores a renderpass from json if it doesn't already exist
-    /// The renderpass will be stored as the path name
-    /// If a renderpass with the name already exists, the existing one will be returned
-    pub fn load_renderpass(&self, path: &str) -> Result<Arc<RenderPass>> {
-        self.renderpasses.load(self, path)
-    }
-
     /// path to return a reference to an already loaded model
     /// Returns None if the model isn't loaded
     pub fn get_pipeline(&self, path: &str) -> Option<Arc<Pipeline>> {
@@ -220,12 +215,31 @@ impl ResourceManager {
         self.pipelines.load(&self, path)
     }
 
+    /// Loads and stores a renderpass from json if it doesn't already exist
+    /// The renderpass will be stored as the path name
+    /// If a renderpass with the name already exists, the existing one will be returned
+    pub fn load_renderpass(&self, path: &str) -> Result<Arc<RenderPass>> {
+        self.renderpasses.load(self, path)
+    }
+
     /// path to return a reference to an already loaded model
     /// Returns None if the renderpass isn't loaded
     pub fn get_renderpass(&self, path: &str) -> Option<Arc<RenderPass>> {
         self.renderpasses.get(path)
     }
 
+    /// Loads and stores a material from json if it doesn't already exist
+    /// The material will be stored as the path name
+    /// If a material with the name already exists, the existing one will be returned
+    pub fn load_material(&self, path: &str) -> Result<Arc<Material>> {
+        self.materials.load(self, path)
+    }
+
+    /// path to return a reference to an already loaded model
+    /// Returns None if the renderpass isn't loaded
+    pub fn get_material(&self, path: &str) -> Option<Arc<Material>> {
+        self.materials.get(path)
+    }
     /// Will place each resource no longer used in a garbage list
     /// The actual resource will get deleted after garbage_cycles cleanup cycles so that it is no longer in use by a pipeline
     /// Should only be called from one thread to avoid thread blocking

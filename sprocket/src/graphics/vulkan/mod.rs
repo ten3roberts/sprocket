@@ -60,6 +60,9 @@ pub use mesh::Mesh;
 pub mod model;
 pub use model::Model;
 
+pub mod material;
+pub use material::{Material, MaterialSpec};
+
 mod buffer;
 pub use super::{Error, Result};
 

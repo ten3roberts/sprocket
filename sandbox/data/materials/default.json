@@ -1,0 +1,7 @@
+{
+    "renderpass": "./data/renderpasses/default.json",
+    "pipeline": "./data/pipelines/default.json",
+    "textures": [
+        "./data/textures/grid.png"
+    ]
+}

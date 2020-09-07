@@ -4,6 +4,7 @@ use ash::version::DeviceV1_0;
 use ash::vk;
 use serde::{Deserialize, Serialize};
 use std::ptr;
+use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub struct DescriptorSetLayoutSpec {
@@ -165,18 +166,28 @@ impl DescriptorSet {
     }
 
     /// Updates the specified descriptors taking into account the bindings and provided data
-    /// The number of supplied uniform buffers should match that of the bindings
-    /// The number of supplied textures should match the bindings
+    /// The resources to be written are given as iterators which are taken in order
+    /// The number of resources in each array should match the number of said resource in the
+    /// binding spec
+    /// The arrays should not have holes, and the index does not correspond to the binding id, but
+    /// rather the nth of that resource
+    /// textures[set][index]
     /// The number of samplers should be the same as the number of textures
     /// Sampler and textures are combined so that texture [2] uses sampler [2]
-    pub fn write(
+    /// The spec is applied to all passes descriptor sets but one
+    pub fn write<'a, U, T, S>(
         device: &ash::Device,
         sets: &[DescriptorSet],
         spec: &DescriptorSetLayoutSpec,
-        buffers: &[UniformBuffer],
-        textures: &[&Texture],
-        samplers: &[&Sampler],
-    ) -> Result<()> {
+        mut uniformbuffers: U,
+        mut textures: T,
+        mut samplers: S,
+    ) -> Result<()>
+    where
+        U: Iterator<Item = &'a UniformBuffer>,
+        T: Iterator<Item = &'a Arc<Texture>>,
+        S: Iterator<Item = &'a Arc<Sampler>>,
+    {
         let bindings = &spec.bindings;
         // The number of uniform buffers specified in the bindings
         let ub_count = bindings
@@ -191,39 +202,25 @@ impl DescriptorSet {
             .count()
             * sets.len();
 
-        if ub_count != buffers.len() {
-            return Err(Error::MismatchedBinding(
-                vk::DescriptorType::UNIFORM_BUFFER,
-                ub_count as u32,
-                buffers.len() as u32,
-            ));
-        }
-
-        if image_count != textures.len() {
-            return Err(Error::MismatchedBinding(
-                vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                image_count as u32,
-                textures.len() as u32,
-            ));
-        }
-
-        if image_count != samplers.len() {
-            return Err(Error::MismatchedBinding(
-                vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                image_count as u32,
-                samplers.len() as u32,
-            ));
-        }
-
         let mut descriptor_writes = Vec::with_capacity(bindings.len() * sets.len());
         let mut buffer_infos = Vec::with_capacity(ub_count);
         let mut image_infos = Vec::with_capacity(image_count);
 
-        for set in sets {
+        for set in sets.iter() {
+            // Restart for each new set
             for binding in bindings {
                 match binding.ty {
                     DescriptorType::UniformBuffer => {
-                        let buffer = &buffers[buffer_infos.len()];
+                        let buffer = match uniformbuffers.next() {
+                            Some(buffer) => buffer,
+                            None => {
+                                return Err(Error::MismatchedBinding(
+                                    vk::DescriptorType::UNIFORM_BUFFER,
+                                    ub_count as u32,
+                                    buffer_infos.len() as u32,
+                                ))
+                            }
+                        };
                         buffer_infos.push(vk::DescriptorBufferInfo {
                             buffer: buffer.buffer(),
                             range: buffer.size(),
@@ -244,11 +241,32 @@ impl DescriptorSet {
                         })
                     }
                     DescriptorType::CombinedImageSampler => {
-                        let texture = &textures[image_infos.len()];
+                        let texture = match textures.next() {
+                            Some(texture) => texture,
+                            None => {
+                                return Err(Error::MismatchedBinding(
+                                    vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                                    image_count as u32,
+                                    image_infos.len() as u32,
+                                ))
+                            }
+                        };
+
+                        let sampler = match samplers.next() {
+                            Some(sampler) => sampler,
+                            None => {
+                                return Err(Error::MismatchedBinding(
+                                    vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                                    image_count as u32,
+                                    image_infos.len() as u32,
+                                ))
+                            }
+                        };
+
                         image_infos.push(vk::DescriptorImageInfo {
                             image_layout: texture.layout(),
                             image_view: texture.image_view(),
-                            sampler: samplers[image_infos.len()].vk(),
+                            sampler: sampler.vk(),
                         });
 
                         descriptor_writes.push(vk::WriteDescriptorSet {

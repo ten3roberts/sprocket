@@ -5,7 +5,7 @@
     "renderpass": "./data/renderpasses/default.json",
     "layouts": [
         {
-       "bindings": [
+            "bindings": [
                 {
                     "slot": 0,
                     "ty": "UniformBuffer",
@@ -13,9 +13,13 @@
                     "stages": [
                         "Vertex"
                     ]
-                },
+                }
+            ]
+        },
+        {
+            "bindings": [
                 {
-                    "slot": 1,
+                    "slot": 0,
                     "ty": "CombinedImageSampler",
                     "count": 1,
                     "stages": [

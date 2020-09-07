@@ -1,4 +1,6 @@
-use super::{DescriptorSet, Framebuffer, IndexBuffer, Mesh, Pipeline, RenderPass, VertexBuffer};
+use super::{
+    DescriptorSet, Framebuffer, IndexBuffer, Material, Mesh, Pipeline, RenderPass, VertexBuffer,
+};
 use ash::version::DeviceV1_0;
 use ash::vk;
 
@@ -185,6 +187,7 @@ impl CommandBuffer {
         };
     }
 
+    /// Binds a vertex buffer separately
     pub fn bind_vertexbuffer(&self, vertexbuffer: &VertexBuffer) {
         unsafe {
             self.device.cmd_bind_vertex_buffers(
@@ -196,6 +199,7 @@ impl CommandBuffer {
         }
     }
 
+    /// Binds an index buffer separately
     pub fn bind_indexbuffer(&self, indexbuffer: &IndexBuffer) {
         unsafe {
             self.device.cmd_bind_index_buffer(
@@ -207,11 +211,30 @@ impl CommandBuffer {
         }
     }
 
+    /// Binds a mesh containing a vertex buffer and index buffer
+    /// Does the equivalent of binding the mesh's vertex and index buffer
     pub fn bind_mesh(&self, mesh: &Mesh) {
         self.bind_vertexbuffer(mesh.vertexbuffer());
         self.bind_indexbuffer(mesh.indexbuffer());
     }
 
+    /// Binds a material and the relevant descriptor sets
+    /// Since binding a material most likely will change the pipeline, the global set (set=0) mut
+    /// be provided and bound again
+    /// Parameter image_index tells which descriptor set in the material to use since there is one
+    /// for each swapchain image
+    pub fn bind_material(&self, material: &Material, global_set: &DescriptorSet, image_index: u32) {
+        self.bind_pipeline(material.pipeline());
+        self.bind_descriptorsets(
+            &material.pipeline(),
+            &[
+                global_set,
+                &material.descriptor_sets()[image_index as usize],
+            ],
+        )
+    }
+
+    /// Binds one or more descriptor sets
     pub fn bind_descriptorsets(&self, pipeline: &Pipeline, descriptor_sets: &[&DescriptorSet]) {
         unsafe {
             let sets: Vec<vk::DescriptorSet> = descriptor_sets.iter().map(|set| set.vk()).collect();

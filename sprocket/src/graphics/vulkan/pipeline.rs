@@ -13,6 +13,11 @@ pub struct PipelineSpec {
     pub fragment_shader: String,
     pub geometry_shader: String,
     pub renderpass: String,
+    /// The descriptor set layouts
+    /// If used in a normal rendering setup the setup is like this
+    /// 0: Global data
+    /// 1: Per material data
+    /// 2: Per entity/draw data
     pub layouts: Vec<DescriptorSetLayoutSpec>,
 }
 
