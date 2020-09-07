@@ -1,7 +1,11 @@
 Graphics:
     - Material
     - Proper renderer
-    - 
+    - Color type (4 byte vector)
+    - Make resourcemanager handle swapchain
+    - Descriptor pool management
+    - Commandbuffer to only bind material if it is not already bound
+
 Systems:
     - Desc: 
       Introduce systems that run asynchronously on different threads
@@ -35,3 +39,7 @@ Systems:
 
 Bugs:
     - vkDeviceWaitIdle locks on repeated calls when resizing several times in a frame. Only happens on Linux with Nvidia
+
+Materials:
+    - Holds the pipeline(shaders)
+    - Holds descriptor set (1) which can include anything from textures to uniform buffers, but are global to the material
