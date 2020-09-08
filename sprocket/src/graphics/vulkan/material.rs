@@ -6,7 +6,7 @@ use ash::vk;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct MaterialSpec {
     pipeline: String,
     textures: Vec<String>,
@@ -126,5 +126,11 @@ impl Material {
 
     pub fn spec(&self) -> &MaterialSpec {
         &self.spec
+    }
+
+    /// Returns self created again from spec but with updated values
+    /// Called when swapchain is recreated
+    pub fn recreate(&self, resourcemanager: &super::ResourceManager) -> Result<Self> {
+        Self::new(self.spec.clone(), resourcemanager)
     }
 }

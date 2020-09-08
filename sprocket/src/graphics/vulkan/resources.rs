@@ -248,10 +248,10 @@ impl ResourceManager {
         self.models.collect_garbage(garbage_cycles);
         self.renderpasses.collect_garbage(garbage_cycles);
         self.pipelines.collect_garbage(garbage_cycles);
+        self.materials.collect_garbage(garbage_cycles);
     }
 
     pub fn recreate(&self) -> Result<()> {
-        log::debug!("Start");
         let swapchain = self.swapchain.read().unwrap();
         let swapchain = swapchain.as_ref().unwrap();
 
@@ -287,7 +287,20 @@ impl ResourceManager {
 
             let _ = std::mem::replace(&mut *pipelines, new_pipelines);
         }
+        {
+            let mut materials = self.materials.resources.write().unwrap();
+            // Now recreate the pipelines
+            // They will query self for the renderpasses which are now replaced
+            let new_materials: HashMap<_, _> = materials
+                .iter()
+                .map(|(k, v)| match v.recreate(&self) {
+                    Ok(v) => Ok((k.to_owned(), Arc::new(v))),
+                    Err(e) => Err(e),
+                })
+                .collect::<Result<HashMap<_, _>>>()?;
 
+            let _ = std::mem::replace(&mut *materials, new_materials);
+        }
         Ok(())
     }
 
@@ -297,6 +310,8 @@ impl ResourceManager {
         result.extend(self.textures.info());
         result.extend(self.models.info());
         result.extend(self.renderpasses.info());
+        result.extend(self.pipelines.info());
+        result.extend(self.materials.info());
 
         result
     }
