@@ -1,11 +1,11 @@
-use super::vertexbuffer::Vertex;
 use super::{resources::Resource, DescriptorSetLayout, DescriptorSetLayoutSpec, Error, Result};
+use super::{vertexbuffer::Vertex, RenderPass};
 
 use ash::version::DeviceV1_0;
 use ash::vk;
 use ex::fs;
 use serde::{Deserialize, Serialize};
-use std::ffi::CStr;
+use std::{ffi::CStr, sync::Arc};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct PipelineSpec {
@@ -26,6 +26,7 @@ pub struct Pipeline {
     layout: vk::PipelineLayout,
     set_layouts: Vec<DescriptorSetLayout>,
     pipeline: vk::Pipeline,
+    renderpass: Arc<RenderPass>,
     spec: PipelineSpec,
 }
 
@@ -223,8 +224,9 @@ impl Pipeline {
         Ok(Pipeline {
             device: device.clone(),
             layout: pipeline_layout,
-            pipeline,
             set_layouts,
+            pipeline,
+            renderpass,
             spec,
         })
     }

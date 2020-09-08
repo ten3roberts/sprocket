@@ -110,6 +110,9 @@ impl<T: Resource> ResourceSystem<T> {
                 true
             }
         });
+        if garbage.len() > 0 {
+            log::debug!("Adding ty {} to garbage", std::any::type_name::<T>())
+        }
     }
 
     pub fn info(&self) -> Vec<ResourceInfo> {
