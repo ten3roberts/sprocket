@@ -34,11 +34,6 @@ impl Swapchain {
             let present_mode = Self::pick_present_mode(present_modes);
             let extent = Self::pick_extent(&capabilities, extent);
 
-            debug!(
-                "Swapchain images: {}<>{}",
-                capabilities.min_image_count, capabilities.max_image_count
-            );
-
             let min_image_count = 3;
 
             let swapchain_loader = ash::extensions::khr::Swapchain::new(instance, device);
