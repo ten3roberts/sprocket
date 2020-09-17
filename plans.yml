@@ -5,6 +5,8 @@ Graphics:
     - Make resourcemanager handle swapchain
     - Descriptor pool management
     - Commandbuffer to only bind material if it is not already bound
+    - Renderpasses shoudln't be determined on a per material basis. Let renderer be in charge of renderpasses and make pipelines agnostic to renderpasses
+    - Shadows, a separate renderpass with pipelines composed of a special fragment shader and the usual vertex shader for the pipeline
 
 Systems:
     - Desc: 
@@ -37,6 +39,15 @@ Systems:
         - The renderer receives the new Text object and replaces the old one
         - The renderer does a tick and calls update on the Text object, which returns a Mesh to display
 
+ECS:
+    Non-serializable components:
+        Since Materials, Renderpasses, Meshes and alike can't be serialized they can't be made into components that live across threads
+        The solution for this is to make the Component version them be a description of them, E.g; a MaterialComponent is only a wrapper of a string that describes the path to the material
+        When the component is sent to the Render thread it is resolved by the resource manager into an actual material, which is only reference counted in the renderer
+        This also means that entities that aren't renderer aren't going to use graphics memory by materials they have
+
+    MeshComponent:
+        Meshes can represent either a string to a path or a Vec of vertices and indices, that are then created when resolved in the renderer
 Bugs:
     - vkDeviceWaitIdle locks on repeated calls when resizing several times in a frame. Only happens on Linux with Nvidia
 
