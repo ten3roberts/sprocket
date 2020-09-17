@@ -1,7 +1,9 @@
 use super::{
     DescriptorSet, Framebuffer, IndexBuffer, Material, Mesh, Pipeline, RenderPass, VertexBuffer,
 };
+
 use ash::version::DeviceV1_0;
+
 use ash::vk;
 
 use super::{Error, Result};
@@ -249,6 +251,26 @@ impl CommandBuffer {
         }
     }
 
+    /// Sets oush constants to the shaders
+    pub fn push_contants<T>(
+        &self,
+        pipeline_layout: vk::PipelineLayout,
+        stages: vk::ShaderStageFlags,
+        offset: u32,
+        constants: &T,
+    ) {
+        let data: *const T = constants;
+        unsafe {
+            self.device.cmd_push_constants(
+                self.commandbuffer,
+                pipeline_layout,
+                stages,
+                offset,
+                std::slice::from_raw_parts(data as *const u8, std::mem::size_of::<T>()),
+            )
+        }
+    }
+
     pub fn draw(&self) {
         unsafe {
             self.device.cmd_draw(self.commandbuffer, 3, 1, 0, 0);
@@ -260,6 +282,12 @@ impl CommandBuffer {
             self.device
                 .cmd_draw_indexed(self.commandbuffer, index_count, 1, 0, 0, 0)
         }
+    }
+
+    /// Resets/Clears the commandbuffer allowing you to once again record commands
+    // Normal comment
+    pub fn reset(&self) -> Result<()> {
+        Ok(unsafe { self.device.reset_command_buffer(self.commandbuffer, Default::default()) }?)
     }
 
     pub fn vk(&self) -> vk::CommandBuffer {

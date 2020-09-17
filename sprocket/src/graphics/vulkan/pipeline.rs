@@ -1,3 +1,4 @@
+use super::descriptors::ShaderStage;
 use super::{resources::Resource, DescriptorSetLayout, DescriptorSetLayoutSpec, Error, Result};
 use super::{vertexbuffer::Vertex, RenderPass};
 
@@ -19,6 +20,26 @@ pub struct PipelineSpec {
     /// 1: Per material data
     /// 2: Per entity/draw data
     pub layouts: Vec<DescriptorSetLayoutSpec>,
+    pub push_constants: Vec<PushConstantRange>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct PushConstantRange {
+    size: u32,
+    offset: u32,
+    stages: Vec<ShaderStage>,
+}
+
+impl PushConstantRange {
+    pub fn to_vk(&self) -> vk::PushConstantRange {
+        vk::PushConstantRange {
+            size: self.size,
+            offset: self.offset,
+            stage_flags: vk::ShaderStageFlags::from_raw(
+                self.stages.iter().fold(0, |acc, val| acc | ((*val) as u32)),
+            ),
+        }
+    }
 }
 
 pub struct Pipeline {
@@ -184,9 +205,14 @@ impl Pipeline {
         let vk_set_layouts: Vec<vk::DescriptorSetLayout> =
             set_layouts.iter().map(|layout| layout.vk()).collect();
 
+        let push_constants = spec
+            .push_constants
+            .iter()
+            .map(|v| v.to_vk())
+            .collect::<Vec<_>>();
         let pipeline_layout_info = vk::PipelineLayoutCreateInfo::builder()
             .set_layouts(&vk_set_layouts)
-            .push_constant_ranges(&[]);
+            .push_constant_ranges(&push_constants);
 
         let pipeline_layout =
             unsafe { device.create_pipeline_layout(&pipeline_layout_info, None)? };

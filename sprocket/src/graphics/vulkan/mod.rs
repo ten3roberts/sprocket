@@ -18,7 +18,7 @@ pub mod sampler;
 pub use sampler::Sampler;
 
 mod swapchain;
-use swapchain::Swapchain;
+pub use swapchain::Swapchain;
 
 mod pipeline;
 pub use pipeline::{Pipeline, PipelineSpec};
@@ -29,11 +29,11 @@ pub use renderpass::{
 };
 
 mod framebuffer;
-use framebuffer::Framebuffer;
+pub use framebuffer::Framebuffer;
 
 mod commandbuffer;
-use commandbuffer::CommandBuffer;
-use commandbuffer::CommandPool;
+pub use commandbuffer::CommandBuffer;
+pub use commandbuffer::CommandPool;
 
 pub mod renderer;
 

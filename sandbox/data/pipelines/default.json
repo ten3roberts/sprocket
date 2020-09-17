@@ -28,5 +28,12 @@
                 }
             ]
         }
+    ],
+    "push_constants": [
+        {
+            "size": 64,
+            "offset": 0,
+            "stages": ["Vertex"]
+        }
     ]
 }

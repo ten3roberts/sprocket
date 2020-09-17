@@ -1,10 +1,22 @@
 use super::VulkanContext;
 use super::*;
 use crate::graphics::vulkan;
+use ecs::{ComponentArray, Entity};
 use math::Mat4;
+use physics::Transform;
 use std::sync::Arc;
 
 const MAX_FRAMES_IN_FLIGHT: usize = 2;
+
+struct EntityData {
+    mvp: Mat4,
+}
+
+pub struct DrawableEntity {
+    pub transform: Transform,
+    // material: Arc<Material>,
+    // mesh: Arc<Mesh>,
+}
 
 pub struct Renderer {
     context: Arc<VulkanContext>,
@@ -16,6 +28,7 @@ pub struct Renderer {
     current_frame: usize,
     data: Data,
     frame_count: usize,
+    entities: ComponentArray<DrawableEntity>,
 }
 
 struct Data {
@@ -28,9 +41,14 @@ struct Data {
     uniformbuffers: Vec<UniformBuffer>,
     descriptor_pool: DescriptorPool,
     global_descriptors: Vec<DescriptorSet>,
+    renderpass: Arc<RenderPass>,
 }
 
 impl Renderer {
+    pub fn insert_entity(&mut self, entity: Entity, component: DrawableEntity) {
+        self.entities.insert_component(entity, component);
+    }
+
     pub fn new(
         context: Arc<VulkanContext>,
         window: &Window,
@@ -64,10 +82,11 @@ impl Renderer {
             data,
             frame_count: 0,
             resourcemanager,
+            entities: ComponentArray::new(),
         })
     }
 
-    pub fn draw_frame(&mut self, window: &Window, time: &Time) {
+    pub fn draw_frame(&mut self, window: &Window, _time: &Time) {
         let device = &self.context.device;
 
         vulkan::wait_for_fences(device, &[self.in_flight_fences[self.current_frame]], true);
@@ -94,21 +113,72 @@ impl Renderer {
             return;
         }
 
-        let ub_data = UniformBufferObject {
-            model:
-            // Mat4::rotate_z(self.frame_count as f32 / 30.0),
-            Mat4::rotate_y(time.elapsed_f32())
-                * Mat4::translate(Vec3::new(0.0, 0.5 * time.elapsed_f32().sin(), 0.0))
-            * Mat4::translate(Vec3::new(0.0, 0.0, -5.0)),
-            view: Mat4::identity(),
-            proj: Mat4::perspective(window.aspect(), 1.0, 0.1, 10.0),
+        // Reset and record command buffers
+        let commandbuffer = &mut self.data.commandbuffers[image_index as usize];
+
+        iferr!("Failed to reset commandbuffers", commandbuffer.reset());
+        iferr!(
+            "Failed to begin recording command buffer",
+            commandbuffer.begin(Default::default())
+        );
+
+        commandbuffer.begin_renderpass(
+            &self.data.renderpass,
+            &self.data.framebuffers[image_index as usize],
+            math::Vec4::new(0.0, 0.0, 0.01, 1.0),
+        );
+        // TODO MaterialComponent and MeshComponent
+        let material = &self.data.material;
+        let mesh = self.data.model.get_mesh_index(0).unwrap();
+
+        // Iterate all entities
+        for entity in &mut self.entities.into_iter() {
+            commandbuffer.bind_material(
+                &material,
+                &self.data.global_descriptors[image_index as usize],
+                image_index,
+            );
+            let model = Mat4::translate(entity.transform.position);
+            let view = Mat4::translate(Vec3::new(0.0, 0.0, -5.0));
+            let proj = Mat4::perspective(window.aspect(), 1.0, 0.1, 10.0);
+
             // proj: Mat4::ortho(window.aspect() as f32 * 2.0, 2 as f32, 0.0, 10.0),
-        };
+            let entity_data = EntityData {
+                mvp: model * view * proj,
+            };
+
+            commandbuffer.push_contants(
+                material.pipeline().layout(),
+                vk::ShaderStageFlags::VERTEX,
+                0,
+                &entity_data,
+            );
+            commandbuffer.bind_mesh(mesh);
+            commandbuffer.draw_indexed(mesh.index_count());
+        }
+
+        commandbuffer.end_renderpass();
 
         iferr!(
-            "Failed to write to uniformbuffer",
-            self.data.uniformbuffers[image_index as usize].write(&ub_data, None)
+            "Failed to begin recording command buffer",
+            commandbuffer.end()
         );
+
+        // let ub_data = UniformBufferObject {
+        //     model:
+        //     // Mat4::rotate_z(self.frame_count as f32 / 30.0),
+        //     Mat4::rotate_y(time.elapsed_f32())
+        //         * Mat4::translate(Vec3::new(0.0, 0.5 * time.elapsed_f32().sin(), 0.0))
+        //     * Mat4::translate(Vec3::new(0.0, 0.0, -5.0)),
+        //     view: Mat4::identity(),
+        //     proj: Mat4::perspective(window.aspect(), 1.0, 0.1, 10.0),
+        //     // proj: Mat4::ortho(window.aspect() as f32 * 2.0, 2 as f32, 0.0, 10.0),
+        // };
+
+        // iferr!(
+        //     "Failed to write to uniformbuffer",
+        // self.data.uniformbuffers[image_index as usize].write(&ub_data, None)
+        // );
 
         // Check if a previous frame is using this image (i.e. there is its fence to wait on)
         if self.images_in_flight[image_index as usize] != vk::Fence::null() {
@@ -202,8 +272,6 @@ impl Renderer {
 
         resourcemanager.set_swapchain(Arc::clone(&swapchain));
 
-        let renderpass = resourcemanager.load_renderpass("./data/renderpasses/default.json")?;
-
         let global_descriptor_layout_spec = DescriptorSetLayoutSpec {
             bindings: vec![DescriptorSetLayoutBinding {
                 slot: 0,
@@ -253,10 +321,11 @@ impl Renderer {
             &context.device,
             context.queue_families.graphics.unwrap(),
             false,
-            false,
+            true,
         )?;
 
         let material = resourcemanager.load_material("./data/materials/default.json")?;
+        let renderpass = resourcemanager.load_renderpass("./data/renderpasses/default.json")?;
 
         let mut framebuffers = Vec::with_capacity(swapchain.image_count());
         for i in 0..swapchain.image_count() {
@@ -294,11 +363,12 @@ impl Renderer {
             commandpool,
             commandbuffers,
             framebuffers,
-            model,
             material,
+            model,
             uniformbuffers,
             descriptor_pool,
             global_descriptors,
+            renderpass,
         })
     }
 }

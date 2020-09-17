@@ -1,9 +1,12 @@
+use crate::ecs::*;
+use crate::math::*;
+use crate::physics::Transform;
 use crate::{event::Event, graphics};
 use crate::{
     graphics::window::{Window, WindowMode},
     Time, Timer,
 };
-use graphics::vulkan::{renderer::Renderer, ResourceManager};
+use graphics::vulkan::{renderer, renderer::Renderer, ResourceManager};
 use log::{error, info};
 use std::{
     sync::{mpsc, Arc},
@@ -18,6 +21,8 @@ pub struct Application {
     renderer: Option<Renderer>,
     graphics_context: Option<graphics::GraphicsContext>,
     resource_manager: Option<Arc<ResourceManager>>,
+    component_manager: ComponentManager,
+    entity_manager: EntityManager,
     time: Time,
 }
 
@@ -32,9 +37,11 @@ impl Application {
             windows: Vec::new(),
             event_receiver,
             event_sender,
+            renderer: None,
             graphics_context: None,
             resource_manager: None,
-            renderer: None,
+            component_manager: ComponentManager::new(),
+            entity_manager: EntityManager::new(),
             time: Time::new(),
         }
     }
@@ -75,7 +82,32 @@ impl Application {
     pub fn run(&mut self) {
         let mut garbage_timer = Timer::with_target(time::Duration::from_secs(2));
         let mut timer = Timer::with_target(time::Duration::from_secs(5));
+
+        // Create some entities
+        let entity = self.entity_manager.create_entity();
+        let entity2 = self.entity_manager.create_entity();
+        self.component_manager
+            .insert_component(entity, Transform::new(Vec3::zero()));
+
+        let renderer = self.renderer.as_mut().unwrap();
+
         while !self.windows.is_empty() {
+            renderer.insert_entity(
+                entity,
+                renderer::DrawableEntity {
+                    transform: Transform::new(Vec3::new(0.0, self.time.elapsed_f32().sin(), 0.0)),
+                },
+            );
+            renderer.insert_entity(
+                entity2,
+                renderer::DrawableEntity {
+                    transform: Transform::new(Vec3::new(
+                        self.time.elapsed_f32().sin() * 3.0,
+                        2.0,
+                        -4.0,
+                    )),
+                },
+            );
             if garbage_timer.signaled() {
                 self.resource_manager.as_ref().unwrap().collect_garbage(5); // Change to swapchain.image_count() in renderer system
                 garbage_timer.restart();
@@ -100,9 +132,7 @@ impl Application {
                 .iter()
                 .for_each(|window| window.process_events());
 
-            if let Some(renderer) = &mut self.renderer {
-                renderer.draw_frame(&self.windows[0], &self.time);
-            }
+            renderer.draw_frame(&self.windows[0], &self.time);
 
             // Receive and handle events
             while let Ok(event) = self.event_receiver.try_recv() {
