@@ -1,7 +1,11 @@
+use std::{thread, time::Duration};
+
 use colorful::{Color, Colorful};
 use log::{Level, LevelFilter, Metadata, Record};
 
 struct Logger;
+
+const ERR_SLEEP_DURATION: u64 = 400;
 
 impl log::Log for Logger {
     fn enabled(&self, metadata: &Metadata) -> bool {
@@ -14,6 +18,9 @@ impl log::Log for Logger {
         }
 
         let level = record.level();
+        if level == Level::Error {
+            thread::sleep(Duration::from_millis(ERR_SLEEP_DURATION));
+        }
 
         let color = match level {
             Level::Trace => Color::LightGray,
