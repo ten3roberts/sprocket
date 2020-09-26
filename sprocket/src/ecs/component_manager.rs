@@ -3,26 +3,8 @@ use std::collections::HashMap;
 use super::component::*;
 use super::component_array::*;
 use super::entity::*;
-// use serde::{Deserialize, Serialize};
 
-// /// Represents updated values for a type of components
-// pub struct ComponentUpdate {
-//     ty: ComponentType,
-//     count: usize,
-//     data: Vec<u8>,
-// }
-
-// impl ComponentUpdate {
-//     /// Creates a new component update from passed components and serializes their value
-//     /// Encodes the type of components
-//     pub fn new<T: 'static + Serialize + Deserialize>(components: &[(Entity, T)]) -> Result<Self> {
-//         Ok(Self {
-//             ty: ComponentType::get::<T>(),
-//             count: components.len(),
-//             data: bincode::serialize(components)?,
-//         })
-//     }
-// }
+type DynComponentArray = Box<dyn IComponentArray>;
 
 /// Manages any type of component array for entities
 /// Does dynamic dispatch on arrays of components
@@ -30,13 +12,15 @@ use super::entity::*;
 /// ComponentArray
 pub struct ComponentManager {
     /// A map of dynamically dispatched ComponentArray
-    component_arrays: HashMap<ComponentType, Box<dyn IComponentArray>>,
+    component_arrays: HashMap<ComponentType, DynComponentArray>,
+    insert_functions: HashMap<ComponentType, Box<dyn Fn(&mut DynComponentArray, ComponentUpdate)>>,
 }
 
 impl ComponentManager {
     pub fn new() -> Self {
         ComponentManager {
             component_arrays: HashMap::new(),
+            insert_functions: HashMap::new(),
         }
     }
 
@@ -50,6 +34,11 @@ impl ComponentManager {
 
         self.component_arrays
             .insert(ty, Box::new(ComponentArray::<T>::new()));
+
+        self.insert_functions.insert(
+            ty,
+            Box::new(|array, update| Self::insert_component_update::<T>(array, update)),
+        );
     }
 
     pub fn get_component<T: 'static>(&self, entity: Entity) -> Option<&T> {
@@ -103,5 +92,31 @@ impl ComponentManager {
         } else {
             return None;
         }
+    }
+}
+
+// Message handling functions
+impl ComponentManager {
+    /// Receives and handles a component update
+    pub fn on_component_update(&mut self, component_update: ComponentUpdate) -> Option<()> {
+        let func = self.insert_functions.get(&component_update.ty())?;
+        let component_array = self.component_arrays.get_mut(&component_update.ty())?;
+        (func)(component_array, component_update);
+        Some(())
+    }
+
+    /// Inserts components as raw bytes
+    /// Panics
+    /// If T is not the same as the internal type of component_update
+    /// If component is not registered
+    fn insert_component_update<T: 'static>(
+        component_array: &mut DynComponentArray,
+        component_update: ComponentUpdate,
+    ) {
+        let component_array = unsafe {
+            &mut *(component_array.as_mut() as *mut dyn IComponentArray as *mut ComponentArray<T>)
+        };
+        let components: Vec<(Entity, T)> = component_update.into();
+        component_array.insert_components(components);
     }
 }

@@ -66,6 +66,14 @@ impl<T: 'static> ComponentArray<T> {
         }
     }
 
+    /// Inserts several components at once
+    pub fn insert_components(&mut self, components: Vec<(Entity, T)>) {
+        components.into_iter().for_each(|(entity, component)| {
+            self.insert_component(entity, component);
+            return ();
+        });
+    }
+
     /// Removes and returns (if any) a component associated to entity
     /// Returns None if component doesn't exist for entity
     pub fn remove_component(&mut self, entity: Entity) -> Option<T> {
