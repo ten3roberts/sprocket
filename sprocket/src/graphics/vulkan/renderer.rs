@@ -12,12 +12,6 @@ struct EntityData {
     mvp: Mat4,
 }
 
-pub struct DrawableEntity {
-    pub transform: Transform,
-    // material: Arc<Material>,
-    // mesh: Arc<Mesh>,
-}
-
 pub struct Renderer {
     context: Arc<VulkanContext>,
     resourcemanager: Arc<ResourceManager>,
@@ -28,7 +22,7 @@ pub struct Renderer {
     current_frame: usize,
     data: Data,
     frame_count: usize,
-    entities: ComponentArray<DrawableEntity>,
+    entities: ComponentArray<Transform>,
 }
 
 struct Data {
@@ -45,8 +39,8 @@ struct Data {
 }
 
 impl Renderer {
-    pub fn insert_entity(&mut self, entity: Entity, component: DrawableEntity) {
-        self.entities.insert_component(entity, component);
+    pub fn insert_entity(&mut self, entity: Entity, transform: Transform) {
+        self.entities.insert_component(entity, transform);
     }
 
     pub fn new(
@@ -132,15 +126,15 @@ impl Renderer {
         let mesh = self.data.model.get_mesh_index(0).unwrap();
 
         // Iterate all entities
-        for entity in &mut self.entities.into_iter() {
+        for transform in &mut self.entities.into_iter() {
             commandbuffer.bind_material(
                 &material,
                 &self.data.global_descriptors[image_index as usize],
                 image_index,
             );
-            let model = Mat4::translate(entity.transform.position);
-            let view = Mat4::translate(Vec3::new(0.0, 0.0, -5.0));
-            let proj = Mat4::perspective(window.aspect(), 1.0, 0.1, 10.0);
+            let model = Mat4::translate(transform.position);
+            let view = Mat4::translate(Vec3::new(0.0, 0.0, -5.0)); // Camera
+            let proj = Mat4::perspective(window.aspect(), 1.0, 0.1, 10.0); // Camera
 
             // proj: Mat4::ortho(window.aspect() as f32 * 2.0, 2 as f32, 0.0, 10.0),
             let entity_data = EntityData {
@@ -153,6 +147,7 @@ impl Renderer {
                 0,
                 &entity_data,
             );
+
             commandbuffer.bind_mesh(mesh);
             commandbuffer.draw_indexed(mesh.index_count());
         }

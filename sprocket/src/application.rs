@@ -6,8 +6,10 @@ use crate::{
     graphics::window::{Window, WindowMode},
     Time, Timer,
 };
-use graphics::vulkan::{renderer, renderer::Renderer, ResourceManager};
+
+use graphics::vulkan::{renderer::Renderer, ResourceManager};
 use log::{error, info};
+
 use std::{
     sync::{mpsc, Arc},
     time,
@@ -94,20 +96,13 @@ impl Application {
         while !self.windows.is_empty() {
             renderer.insert_entity(
                 entity,
-                renderer::DrawableEntity {
-                    transform: Transform::new(Vec3::new(0.0, self.time.elapsed_f32().sin(), 0.0)),
-                },
+                Transform::new(Vec3::new(0.0, self.time.elapsed_f32().sin(), 0.0)),
             );
             renderer.insert_entity(
                 entity2,
-                renderer::DrawableEntity {
-                    transform: Transform::new(Vec3::new(
-                        self.time.elapsed_f32().sin() * 3.0,
-                        2.0,
-                        -4.0,
-                    )),
-                },
+                Transform::new(Vec3::new(self.time.elapsed_f32().sin() * 3.0, 2.0, -4.0)),
             );
+
             if garbage_timer.signaled() {
                 self.resource_manager.as_ref().unwrap().collect_garbage(5); // Change to swapchain.image_count() in renderer system
                 garbage_timer.restart();
